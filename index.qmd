@@ -1,0 +1,16 @@
+---
+title: "Pathways After High School – Southern Minnesota"
+editor: visual
+---
+
+# Pathways to Meaningful Regional Employment in Southern Minnesota
+
+## Purpose of the Research
+
+This research examined which factors most strongly influence whether individuals achieve **meaningful employment within Southern Minnesota’s region (EDR 9 & 10)** after high school. Using both **contingency table analysis (effect sizes, trends over 1, 5, and 10 years)** and **CART modeling**, the goal was to identify which variables most reliably anchor individuals in the regional workforce versus those that push them toward statewide mobility, disconnection, or outmigration.
+
+A special focus was also placed on **non-college graduates**, who represent a substantial share of the region’s young adults and are at higher risk of disconnection from the labor force. Understanding their pathways provides additional insights into how to build a stronger, more inclusive regional workforce.
+
+The findings provide a roadmap for education and workforce policy, showing how **demographics, high school context, accomplishments, and postsecondary experiences** interact to shape local labor market attachment.
+
+------------------------------------------------------------------------
