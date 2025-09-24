@@ -14,3 +14,80 @@ A special focus was also placed on **non-college graduates**, who represent a su
 The findings provide a roadmap for education and workforce policy, showing how **demographics, high school context, accomplishments, and postsecondary experiences** interact to shape local labor market attachment.
 
 ------------------------------------------------------------------------
+
+# Grand Summary
+
+\[here\]
+
+# Summaries of each analysis
+
+## Employment relationships
+
+\[here\]
+
+## Post-secondary relationships
+
+Across all four postsecondary outcomes — **attended.ps, ps.grad, ps.grad.InstitutionSector, ps.grad.location, and highest.cred.level** — consistent patterns emerge about which factors shape educational attainment and how these pathways tie into **regional workforce retention versus mobility and disconnection**.
+
+The evidence is clear: **postsecondary experiences are the strongest predictors of long-term employment outcomes**, but they are deeply influenced by demographic background, high school context, and student accomplishments. This creates a **dual-pipeline system**: one that anchors students to Southern MN through CTE and sub-baccalaureate credentials, and another that channels academically strong students into statewide or national mobility through 4-year and higher pathways.
+
+------------------------------------------------------------------------
+
+### **1. Attending Postsecondary Education**
+
+-   **Key Predictors**: Economic status (low-income less likely to attend), race/ethnicity (persistent gaps), and special education status (lower attendance).\
+-   **Takeaway**: Disadvantaged students are disproportionately less likely to enroll in PS at all, putting them at high risk of long-term disconnection.
+
+------------------------------------------------------------------------
+
+### **2. Postsecondary Graduation (ps.grad)**
+
+-   **Key Predictors**: Economic status and SPED remain barriers to completion; racial gaps persist; academic readiness improves odds of graduating.\
+-   **Takeaway**: Simply **completing** PS dramatically reduces disconnection and boosts employment. Non-completers remain the most vulnerable group in the workforce pipeline.
+
+------------------------------------------------------------------------
+
+### **3. Institution Sector of Graduation (ps.grad.InstitutionSector)**
+
+-   **Key Predictors**:
+    -   **Academic rigor and PSEO** → 4-year completions.\
+    -   **CTE engagement, SPED, and low-income** → 2-year completions.\
+-   **Takeaway**: Institution type sorts students into applied versus academic pathways. Since **2-year completions are more strongly tied to regional employment**, CTE and disadvantage groups inadvertently form the backbone of Southern MN’s workforce, while academically strong students pursue more mobile 4-year pathways.
+
+------------------------------------------------------------------------
+
+### **4. Location of Graduation (ps.grad.location)**
+
+-   **Key Predictors**:
+    -   **Disadvantaged students (low-income, SPED, marginalized race/ethnicity)** → more likely to graduate in **Southern MN**.\
+    -   **High scorers and PSEO participants** → more likely to graduate outside the region (other MN or out-of-state).\
+    -   **Local economic conditions** (lower wages, higher unemployment) → stronger Southern MN completions.\
+-   **Takeaway**: Regional completions are most common among disadvantaged groups and CTE students, reinforcing their role in regional workforce stability.
+
+------------------------------------------------------------------------
+
+### **5. Highest Credential Earned (highest.cred.level)**
+
+-   **Key Predictors**:
+    -   **Academic rigor (ACT, MCA)** and **PSEO** → bachelor’s or higher.\
+    -   **CTE engagement, low-income, SPED, disadvantaged counties** → associate or sub-associate.\
+-   **Takeaway**: Credential level is the clearest stratifier of opportunity. **Bachelor’s+ aligns with mobility**, while **associate/sub-associate aligns with regional employment**.
+
+------------------------------------------------------------------------
+
+### **Overall Conclusion**
+
+The postsecondary pipeline is shaped by **two reinforcing forces**:
+
+1.  **Mobility Pipeline**:
+    -   Driven by **academic rigor and PSEO**.
+    -   Leads to **4-year+ degrees, completions outside the region, and statewide mobility**.
+    -   Most common among advantaged, higher-scoring students.
+2.  **Regional Pipeline**:
+    -   Driven by **CTE engagement, 2-year institutions, economic disadvantage, SPED, and lower-wage/unemployment counties**.
+    -   Leads to **associate/sub-associate degrees and Southern MN completions**, strongly tied to **meaningful regional employment**.
+    -   Most common among disadvantaged students who remain anchored locally.
+
+In short: **Southern MN’s workforce stability relies heavily on the regional pipeline of 2-year and CTE-driven pathways**, which disproportionately serve low-income and SPED students. Meanwhile, academically strong and advantaged students pursue 4-year and higher credentials, fueling statewide and out-of-state mobility.
+
+**Policy Implication**: To strengthen the regional workforce, interventions should both (1) support disadvantaged students in completing and leveraging their 2-year pathways and (2) create incentives for academically strong students to remain engaged in the region after completing higher degrees.
