@@ -1,0 +1,2629 @@
+---
+title: "Local Employment CART Analysis"
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(sf)
+library(ggrepel)
+library(scales)
+library(shiny)
+library(shinycssloaders)
+library(ggiraph)
+library(kableExtra)
+library(rmapshaper)
+library(cowplot)
+library(DT)
+library(htmlwidgets)
+library(RColorBrewer)
+library(readxl)
+library(janitor)
+library(lubridate)
+library(systemfonts)
+reset_font_cache()
+library(ggtext)
+library(gmodels)
+library(fastDummies)
+library(car)
+library(glmnet)
+library(glmnetUtils)
+library(pscl)
+library(sjPlot)
+library(ggforce)
+library(rpart)
+library(rpart.plot)
+library(tidymodels)
+library(caret)
+library(themis)
+library(ranger)
+```
+
+```{r themes and shapefiles, include=FALSE}
+theme_bar <- theme_bw() +
+  theme(panel.grid.major = element_line(color = "grey70", linewidth  = 0.1),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_text(face = "bold"),
+        panel.border = element_blank(),
+        legend.background = element_rect(fill = "transparent", color = "transparent"),
+        legend.key = element_rect(fill = "transparent"),
+        legend.key.size = unit(1, "lines"),
+        legend.margin = margin(0,0,0,0),
+        legend.title = element_blank(),
+        legend.text = element_text(margin = margin(l = 2)),
+        text = element_text(family = "Arial") ,
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold"))
+
+theme_line <- theme_bw() +
+  theme(legend.background = element_rect(fill = "transparent", color = "transparent"),
+        legend.key = element_rect(fill = "transparent"),
+        legend.text = element_text(margin = margin(l = 2)),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(color = "grey70", linewidth = 0.1),
+        axis.ticks = element_blank(),
+        axis.text = element_text(face = "bold"),
+        panel.border = element_blank(),
+        legend.margin = margin(0,0,0,0),
+        legend.key.size = unit(1, "lines"),
+        text = element_text(family = "Arial") ,
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold"))
+
+
+theme_sf <- theme_bw() +
+  theme(axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_line(color = "white"),
+        panel.border = element_blank(),
+        legend.title = element_blank(),
+        legend.text = element_text(margin = margin(l = 2)),
+        legend.margin = margin(0,0,0,0),
+        legend.key.size = unit(1, "lines"),
+        text = element_text(family = "Arial") ,
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold"))
+
+regions <- read_csv("/Users/kellyasche/Library/CloudStorage/GoogleDrive-kasche@ruralmn.org/My Drive/Data Prep/R Projects/Join docs/county_regions.csv") %>%
+    select(5,6) %>%
+    unique() %>%
+    mutate(edr = str_replace(edr, "  ", " "),
+           planning.region = str_replace(planning.region, " Minnesota", ""),
+           planning.region = fct_relevel(planning.region, "Northwest", "Northeast", "Central", "Seven County Mpls-St Paul", "Southwest", "Southeast"),
+           edr = fct_relevel(edr, "EDR 1 - Northwest", "EDR 2 - Headwaters", "EDR 3 - Arrowhead", "EDR 4 - West Central", "EDR 5 - North Central", "EDR 6E- Southwest Central", "EDR 6W- Upper Minnesota Valley", "EDR 7E- East Central", "EDR 7W- Central", "EDR 8 - Southwest", "EDR 9 - South Central", "EDR 10 - Southeast", "EDR 11 - 7 County Twin Cities", "Minnesota"))
+
+counties.regions <- read_csv("/Users/kellyasche/Library/CloudStorage/GoogleDrive-kasche@ruralmn.org/My Drive/Data Prep/R Projects/Join docs/county_regions.csv") %>%
+  rename(mif = `MIF Region`) %>%
+  mutate(countyfp = formatC(countyfp, width = 3, flag = "0"),
+         Name = str_to_title(Name),
+         Name = str_replace(Name, "Q", "q"),
+         Name = str_replace(Name, "Of The", "of the"),
+         Name = str_replace(Name, "Mcleod", "McLeod"),
+         Dem_Desc = ifelse(Name == "Minnesota", "Minnesota", Dem_Desc) ,
+         edr = str_replace(edr, "  ", " "),
+         planning.region = str_replace(planning.region, " Minnesota", ""),
+         planning.region = fct_relevel(planning.region, "Northwest", "Northeast", "Central", "Seven County Mpls-St Paul", "Southwest", "Southeast"),
+         edr = fct_relevel(edr, "EDR 1 - Northwest", "EDR 2 - Headwaters", "EDR 3 - Arrowhead", "EDR 4 - West Central", "EDR 5 - North Central", "EDR 6E- Southwest Central", "EDR 6W- Upper Minnesota Valley", "EDR 7E- East Central", "EDR 7W- Central", "EDR 8 - Southwest", "EDR 9 - South Central", "EDR 10 - Southeast", "EDR 11 - 7 County Twin Cities", "Minnesota"),
+         Dem_Desc = fct_relevel(Dem_Desc, "Entirely rural", "Town/rural mix", "Urban/town/rural mix", "Entirely urban"))
+
+counties.regions.1 <- counties.regions %>%
+  mutate(statefp = "27",
+         project.pr = ifelse(edr %in% c("EDR 1 - Northwest", "EDR 2 - Headwaters", "EDR 4 - West Central"), "Northwest",
+                             ifelse(edr == "EDR 3 - Arrowhead", "Northeast",
+                                    ifelse(edr %in% c("EDR 5 - North Central", "EDR 7E- East Central", "EDR 7W- Central"), "Central",
+                                           ifelse(edr %in% c("EDR 6E- Southwest Central", "EDR 6W- Upper Minnesota Valley", "EDR 8 - Southwest"), "Southwest",
+                                                  ifelse(edr %in% c("EDR 9 - South Central", "EDR 10 - Southeast"), "Southern", as.character(planning.region)))))),
+         project.pr = fct_relevel(project.pr, "Northwest", "Northeast", "Central", "Seven County Mpls-St Paul", "Southwest", "Southern"))
+
+
+color.ruca <- c("Entirely rural" = "#009933", "Town/rural mix" = "#99CC33", "Urban/town/rural mix" = "#CC9966", "Entirely urban" = "#754C29", "Minnesota" = "black")
+
+color.pr <- c("Northwest" = 	"#4575b4", "Northeast" = "grey", "Central" = "#fee090", "Seven County Mpls-St Paul" = "#d73027", "Southwest" = "#91bfdb", "Southeast" = "#fc8d59", "Minnesota" = "black")
+
+color.edr <- c("EDR 1 - Northwest" = "#b3cde3", "EDR 2 - Headwaters" = "#8c96c6", "EDR 3 - Arrowhead" = "#fe9929", "EDR 4 - West Central" = "#8856a7", "EDR 5 - North Central" = "#810f7c", "EDR 6E- Southwest Central" = "#e5f5f9", "EDR 6W- Upper Minnesota Valley" = "#bdc9e1", "EDR 7E- East Central" = "#99d8c9", "EDR 7W- Central" = "#2ca25f", "EDR 8 - Southwest" = "#74a9cf", "EDR 9 - South Central" = "#0570b0", "EDR 10 - Southeast" = "#d7301f", "EDR 11 - 7 County Twin Cities" = "#d8b365", "Minnesota" = "black")
+
+color.edr.simple <- c("EDR 1" = "#b3cde3", "EDR 2" = "#8c96c6", "EDR 3" = "#fe9929", "EDR 4" = "#8856a7", "EDR 5" = "#810f7c", "EDR 6E" = "#e5f5f9", "EDR 6W" = "#bdc9e1", "EDR 7E" = "#99d8c9", "EDR 7W" = "#2ca25f", "EDR 8" = "#74a9cf", "EDR 9" = "#0570b0", "EDR 10" = "#d7301f", "EDR 11" = "#d8b365", "Minnesota" = "black")
+
+color.pr.edr <- c ("Northwest" = "#4575b4","Northeast" = "#e0f3f8", "Central" = "#fee090", "Seven County Mpls-St Paul" = "#d73027", "Southwest" = "#91bfdb", "Southeast" = "#fc8d59", "Minnesota" = "black", "EDR 1 - Northwest" = "#b3cde3", "EDR 2 - Headwaters" = "#8c96c6", "EDR 3 - Arrowhead" = "#fe9929", "EDR 4 - West Central" = "#8856a7", "EDR 5 - North Central" = "#810f7c", "EDR 6E- Southwest Central" = "#e5f5f9", "EDR 6W- Upper Minnesota Valley" = "#bdc9e1", "EDR 7E- East Central" = "#99d8c9", "EDR 7W- Central" = "#2ca25f", "EDR 8 - Southwest" = "#74a9cf", "EDR 9 - South Central" = "#0570b0", "EDR 10 - Southeast" = "#d7301f", "EDR 11 - 7 County Twin Cities" = "#d8b365")
+
+mn_counties <- st_read("/Users/kellyasche/Library/CloudStorage/GoogleDrive-kasche@ruralmn.org/My Drive/Data Prep/R Projects/Shapefiles/County shapefiles/MNCounties_MNDOT.shp", quiet = TRUE) %>%
+  ms_simplify(keep = .01, keep_shapes = TRUE) %>%
+  rename(countyfp = FIPS_CODE)
+```
+
+```{r master}
+master.original <- read_csv("Data/SLEDS/Masters/After analysis/Master-after-ct.csv") %>%
+  mutate(ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector == "1", "Public, 4-year", as.character(ps.grad.InstitutionSector)),
+         ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector == "4", "Public, 2-year", as.character(ps.grad.InstitutionSector)),
+         ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector == "11", "Other", as.character(ps.grad.InstitutionSector)),
+         ps.grad.location = ifelse(ps.grad.location == "PS grad EDR", "PS grad region", ps.grad.location),
+         highest.cred.level = as.factor(highest.cred.level))
+
+kable(names(master.original))
+
+kable(head(master.original))
+```
+
+# Introduction
+
+This analysis explores the use of Classification and Regression Trees (CART) to model the predictors of postsecondary employment outcomes for high school graduates in Southern Minnesota. While previous work has focused on bivariate associations between demographic, high school, and postsecondary characteristics with employment outcomes, this study extends the analysis by constructing predictive models. The primary goal is to identify the variables and decision rules that best distinguish between students who achieve meaningful employment in the Southern Minnesota region and those whose outcomes differ.
+
+To capture the dynamics of post-graduation pathways, the CART models are developed separately for three points in time: one year after graduation, five years after graduation, and ten years after graduation. For each time horizon, three versions of the model are constructed: a base model (full tree grown without constraints), a pre-pruned model (tree growth limited by tuning parameters to prevent overfitting), and a post-pruned model (full tree grown and subsequently pruned for parsimony).
+
+# Methodology
+
+## Dependent Variables
+
+Three sets of binary employment outcomes are used as dependent variables. Each set compares meaningful employment in the Southern Minnesota region to an alternative outcome:
+
+1.  **Regional vs. Non-Regional Employment in Minnesota**
+    -   Group 1: Meaningful employment in the Southern Minnesota region.
+    -   Group 2: Meaningful employment elsewhere in Minnesota, outside the region.
+2.  **Regional Employment vs. No Meaningful Employment in Minnesota (and not attending postsecondary)**
+    -   Group 1: Meaningful employment in the Southern Minnesota region.
+    -   Group 2: Individuals without meaningful employment anywhere in Minnesota and not attending postsecondary.
+3.  **Regional Employment vs. No Minnesota Employment Record (and not attending postsecondary)**
+    -   Group 1: Meaningful employment in the Southern Minnesota region.
+    -   Group 2: Individuals with no Minnesota employment record and not attending postsecondary.
+
+Each dependent variable set is modeled separately for graduates at 1, 5, and 10 years post–high school.
+
+## Independent Variables
+
+Independent variables are drawn from those identified as **strong** or **moderate predictors** of regional employment and disconnection in the prior employment relationship analysis. These include a mix of postsecondary, demographic, high school, and accomplishment factors.
+
+-   **Postsecondary Factors**
+    -   **ps.grad.location**: Location of postsecondary graduation (Southern MN, other MN, outside MN).
+    -   **ps.grad**: Whether the individual graduated from postsecondary.
+    -   **highest.cred.level**: Highest credential level earned.
+    -   **ps.grad.InstitutionSector**: Sector of postsecondary institution (Public 2-year, Public 4-year, Other).
+-   **Demographic Factors**
+    -   **economic.status**: Low-income status (low-income vs. non-low-income).
+    -   **SpecialEdStatus**: Whether the student received special education services.
+    -   **RaceEthnicity**: Persistent disparities across racial/ethnic groups.
+    -   **Gender**: Gender differences in early postsecondary and employment pathways.
+-   **High School Factors**
+    -   **Dem_Desc**: Rural vs. metro classification of high school origin.
+    -   **avg.unemp.rate**: Average unemployment rate in the local labor market.
+    -   **avg.wage.pct.state**: Average local wage levels relative to statewide wages.
+-   **High School Accomplishments**
+    -   **CTE achievement**: Concentrator/completer status in Career and Technical Education.
+    -   **total.cte.courses.taken**: Number of CTE courses taken.
+    -   **ACTCompositeScore**: Composite ACT score.
+    -   **MCA Math, Reading, Science**: Minnesota Comprehensive Assessment scores.
+
+These predictors reflect the strongest and most consistent signals from prior analyses. Collectively, they capture the dual pipeline identified: CTE engagement and 2-year credentials strongly anchor graduates to the regional workforce, while higher academic achievement and 4-year+ credentials are linked to statewide mobility. Disadvantage markers such as low-income and special education status persist as risk factors for disconnection, making them critical to include in predictive modeling.
+
+## Model Construction
+
+For each dependent variable set and time horizon (grad.year.1, grad.year.5, grad.year.10), three CART models are built:
+
+1.  **Base Model**: A fully grown tree without constraints, designed to maximize classification accuracy on the training data.
+2.  **Pre-Pruned Model**: A tree grown with restrictions on depth, minimum splits, or complexity parameters to limit overfitting during construction.
+3.  **Post-Pruned Model**: A fully grown tree subsequently pruned based on cross-validation or complexity parameter criteria to improve interpretability and generalization.
+
+This approach allows for direct comparison between unconstrained and optimized models, highlighting both predictive accuracy and interpretability in understanding pathways to meaningful employment in the region.
+
+```{r}
+data <- master.original %>%
+  select(economic.status, SpecialEdStatus, RaceEthnicity, Gender, Dem_Desc, avg.unemp.rate, avg.wages.pct.state, cte.achievement, total.cte.courses.taken, ACTCompositeScore, MCA.M, MCA.R, MCA.S, ps.grad, ps.grad.location, ps.grad.InstitutionSector, highest.cred.level, grad.year.1, grad.year.5, grad.year.10)
+
+data.grad.year.1 <- data %>%
+  select(-ps.grad.location, -ps.grad, -highest.cred.level, -ps.grad.InstitutionSector) 
+
+
+
+```
+
+<br>
+
+# Analysis - Meaningful employment MN
+
+## Synthesis: Meaningful Employment in Region vs. Meaningful Employment Elsewhere in Minnesota
+
+### **Main takeaway**
+
+Across one, five, and ten years after graduation, the models consistently show that **CTE engagement, sub-baccalaureate pathways, and favorable local economic conditions** are the strongest anchors for regional employment in Southern Minnesota. In contrast, **Bachelor’s degree attainment, higher academic achievement, and graduation from outside the region** predict statewide mobility. The split between regional and statewide employment becomes sharper over time, with early CTE anchors persisting and academic pathways leading outward.
+
+------------------------------------------------------------------------
+
+### **Year 1 after Graduation**
+
+-   **Accuracy:** 75.5% (pre-pruned model).
+-   **Anchors:** At least one CTE course, favorable local wage environments, and rural/metro differences.
+-   **Barriers:** Lack of CTE, weaker wage contexts, and certain racial/ethnic groups showing weaker anchoring.
+-   **Interpretation:** In the short term, **CTE exposure and local labor market conditions** are decisive for anchoring students regionally. Academic factors play a smaller role at this stage.
+
+------------------------------------------------------------------------
+
+### **Year 5 after Graduation**
+
+-   **Accuracy:** 67.8% (post-pruned model).
+-   **Anchors:** CTE concentrator/completer status, sub-baccalaureate credentials, and Minnesota postsecondary graduation within the region.
+-   **Barriers:** Bachelor’s degree attainment, very high ACT scores, and graduation from institutions outside Southern MN.
+-   **Interpretation:** By year five, **postsecondary pathways and credential type become decisive**. CTE depth and 2-year completions hold students regionally, while 4-year degrees and higher academic achievement increase mobility across the state.
+
+------------------------------------------------------------------------
+
+### **Year 10 after Graduation**
+
+-   **Accuracy:** 64.4% (post-pruned model).
+-   **Anchors:** Regional postsecondary graduation, sub-baccalaureate credentials, higher local wage environments.
+-   **Barriers:** Bachelor’s degrees, high ACT and MCA Reading scores, and low-wage regions.
+-   **Interpretation:** At year ten, **regional anchoring depends on local graduation, sub-baccalaureate training, and wage competitiveness**. Academic high achievers and 4-year graduates are firmly pulled into statewide employment markets.
+
+------------------------------------------------------------------------
+
+### **Overall Summary**
+
+The CART models show a clear dual pipeline:
+
+-   **Regional Anchors:** CTE engagement, 2-year/sub-baccalaureate pathways, and favorable local economic conditions consistently increase the likelihood of meaningful employment in Southern Minnesota.
+-   **Statewide Mobility:** Bachelor’s degrees, high ACT/MCA scores, and graduation from outside the region push students into broader Minnesota employment markets.
+
+The balance between anchors and mobility factors shifts over time: **local CTE and economic conditions matter most early on, while credential level and academic achievement dominate longer-term trajectories.**
+
+------------------------------------------------------------------------
+
+### **Policy/Practice Implications**
+
+-   **Strengthen CTE pipelines and sub-baccalaureate opportunities** to maintain a strong anchor for the regional workforce.
+-   **Support students of color and low-income groups** by connecting CTE pathways to local employers, reducing disparities in regional retention.
+-   **Develop regional strategies to retain Bachelor’s degree holders and high academic achievers**, such as internships, competitive wage offerings, and professional pathways tied to local industries.
+-   **Sustain competitive local wages** to prevent outward mobility, particularly among graduates who might otherwise seek higher-paying opportunities elsewhere in Minnesota.
+
+<br>
+
+## One year after graduation
+
+First I'm going to filter out the data so only individuals that had meaningful employment in the region or Minnesota are in the dataset. In addition, I'm going to remove all the post-secondary variables from the model since those are variables that take place in the future. In addition, I'm going to remove individuals that are currently attending college one year after graduation. This should keep the model clean.
+
+The table below shows that 75% of the individuals have meaningful employment in their high school region compared to 25% that have meaningful employment in Minnesota, but not their region.
+
+```{r}
+meaningful.emp.mn.grad.year.1 <- data.grad.year.1 %>%
+  select(-grad.year.5, -grad.year.10) %>%
+  filter(grad.year.1 %in% c("Meaningful emp region", "Meaningful emp MN")) %>%
+  mutate(grad.year.1 = as.factor(grad.year.1))
+
+comma(nrow(meaningful.emp.mn.grad.year.1))
+
+datatable(data = meaningful.emp.mn.grad.year.1 %>%
+            group_by(grad.year.1) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+### Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(meaningful.emp.mn.grad.year.1), nrow(meaningful.emp.mn.grad.year.1) *.7)
+
+train <- meaningful.emp.mn.grad.year.1[sample_ind,]
+
+test <- meaningful.emp.mn.grad.year.1[-sample_ind,]
+
+#Base model
+
+meaningful.emp.mn.grad.year.1.model <- rpart(grad.year.1 ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(meaningful.emp.mn.grad.year.1.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$grad.year.1)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(meaningful.emp.mn.grad.year.1.model)
+
+plotcp(meaningful.emp.mn.grad.year.1.model)
+```
+
+**Key takeaways from base tree results**
+
+-   Accuracy: 71.5%
+-   The tree is using **13 variables** from demographics, high school characteristics, and high school accomplishments
+    -   Demographics: 4/4
+    -   HS Characteristics: 3/3
+    -   HS Accomplishments: 6/6
+-   The lowest cross-validation error (xerror)
+    -   Step: 2
+    -   xerror: 0.97725
+    -   cp: 2.1408e-03
+    -   splits: 6
+-   Total splits: 486
+
+<br>
+
+### Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)).
+-   minbucket: round(minsplit / 3).
+-   cp = 0
+
+<br>
+
+```{r, echo=TRUE}
+maxdepth = 5
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+meaningful.emp.mn.grad.year.1.model.preprune <- rpart(grad.year.1 ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(meaningful.emp.mn.grad.year.1.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$grad.year.1)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(meaningful.emp.mn.grad.year.1.model.preprune)
+
+plotcp(meaningful.emp.mn.grad.year.1.model.preprune)
+
+```
+
+-   Accuracy: 71.5% -\> 75.5%
+-   The tree is using **4 variables**
+    -   Demographics: 1/4 - Race and ethnicity
+    -   HS characteristics: 2/3 - unemployment, wages
+    -   HS accomplishments: 1 - CTE
+-   The lowest cross-validation error (xerror)
+    -   Step: 2
+    -   xerror: 0.98448
+    -   cp: 0
+    -   splits: 5
+-   Total splits: 5
+
+<br>
+
+### Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+Since the lowest xerror had a CP = 0, we will use the 1-SE rule.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- meaningful.emp.mn.grad.year.1.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- meaningful.emp.mn.grad.year.1.model.preprune$cptable[which.min(meaningful.emp.mn.grad.year.1.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+meaningful.emp.mn.grad.year.1.model.postprune <- rpart::prune(meaningful.emp.mn.grad.year.1.model.preprune, cp = cp_1se)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(meaningful.emp.mn.grad.year.1.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$grad.year.1)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(meaningful.emp.mn.grad.year.1.model.postprune)
+
+plotcp(meaningful.emp.mn.grad.year.1.model.postprune)
+```
+
+-   Accuracy: 75.5% -\> 75.5%
+-   The tree is using **4 variables**
+    -   Demographics: 1/4 - Race and ethnicity
+    -   HS characteristics: 2/3 - unemployment, wages
+    -   HS accomplishments: 1 - CTE
+-   The lowest cross-validation error (xerror)
+    -   Step: 2
+    -   xerror: 0.98448
+    -   cp: 0
+    -   splits: 5
+-   Total splits: 5
+
+So, the accuracy of these are;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model and the pre-pruned model are the same. So I will just use the pre-pruned model.
+
+```{r}
+#Plot tree
+rpart.plot(meaningful.emp.mn.grad.year.1.model.preprune, nn = TRUE)
+```
+
+### **Main takeaway**
+
+At one year after graduation, **regional employment is strongly anchored by CTE course-taking, local labor market conditions (unemployment, wages), and race/ethnicity**. Students with some CTE exposure, in stronger local economies, are much more likely to remain in Southern Minnesota for meaningful employment.
+
+### **Key Findings**
+
+-   **Model accuracy:** 75.5% (pre-pruned model, 5 splits).
+-   **Most important predictors:** *Race/Ethnicity*, *total CTE courses taken*, *local unemployment rate (avg.unemp.rate)*, and *local wage levels relative to the state (avg.wages.pct.state)*.
+-   **Overall pattern:** Anchors for regional employment emerge from a combination of **CTE engagement** and **favorable economic conditions**.
+
+### **Interpretation**
+
+-   **Race/Ethnicity:** For American Indian, Asian/Pacific Islander, and Black students, regional employment rates were lower overall, though still above 50%. White and Hispanic students showed stronger anchoring in the region.
+-   **CTE course-taking:** Students with at least one CTE course were more likely to remain regionally employed; lack of CTE exposure combined with weaker local wage environments increased the chance of statewide mobility.
+-   **Local economic context:**
+    -   Low local unemployment (\<3%) combined with certain race/ethnicity groups increased the likelihood of statewide rather than regional employment.
+    -   Higher local wages (≥0.92 of the state average) anchored students more securely in the region.
+    -   Moderate wages and no CTE exposure increased risk of statewide mobility.
+
+### **Decision Tree Interpretation**
+
+-   **Root split:** Race/Ethnicity. Students of color (AI, Asian/PI, Black) were somewhat less likely to be anchored regionally, with stronger effects in low-unemployment areas.
+-   **Second layer:** For White/Hispanic students, *CTE exposure* was decisive. Having at least one CTE course strongly pushed students toward regional employment.
+-   **Economic context:** Among students without CTE exposure, *wage levels* differentiated outcomes. Moderate-to-high wages anchored them regionally, while weaker wages tipped some toward statewide employment.
+
+### **Summary**
+
+At one year after graduation, **CTE course-taking and favorable local economic conditions (low unemployment, higher relative wages) are the strongest anchors for meaningful regional employment**. Race/ethnicity plays a role, with students of color showing somewhat weaker regional retention, especially in stronger job markets. The lack of CTE exposure, particularly when combined with weaker wages, increases the likelihood of graduates finding employment elsewhere in Minnesota.
+
+### **Policy/Practice Implications**
+
+This suggests that **expanding CTE access and depth** can help strengthen early regional workforce attachment. Additionally, **supporting students of color with pathways that connect CTE engagement to regional employers** may reduce disparities in retention. Local wage and employment conditions clearly shape outcomes, meaning that **partnerships with regional industries to maintain competitive wages** could further anchor graduates in Southern Minnesota.
+
+<br>
+
+## Five years after graduation
+
+I'm going to follow the same process as the one year after graduation process, but I'm going to add in the post-secondary variables now.
+
+The table below shows a bit more balanced classifications with 63% of the individuals having meaningful employment in their high school region compared to 38% that have meaningful employment in Minnesota, but not their region.
+
+```{r}
+meaningful.emp.mn.grad.year.5 <- data %>%
+  select(-grad.year.1, -grad.year.10) %>%
+  filter(grad.year.5 %in% c("Meaningful emp region", "Meaningful emp MN")) %>%
+  mutate(grad.year.5 = as.factor(grad.year.5))
+
+comma(nrow(meaningful.emp.mn.grad.year.5))
+
+datatable(data = meaningful.emp.mn.grad.year.5 %>%
+            group_by(grad.year.5) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+### Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(meaningful.emp.mn.grad.year.5), nrow(meaningful.emp.mn.grad.year.5) *.7)
+
+train <- meaningful.emp.mn.grad.year.5[sample_ind,]
+
+test <- meaningful.emp.mn.grad.year.5[-sample_ind,]
+
+#Base model
+
+meaningful.emp.mn.grad.year.5.model <- rpart(grad.year.5 ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(meaningful.emp.mn.grad.year.5.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$grad.year.5)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(meaningful.emp.mn.grad.year.5.model)
+
+plotcp(meaningful.emp.mn.grad.year.5.model)
+```
+
+**Key takeaways from base tree results**
+
+-   Accuracy: 62.4%
+-   The tree is using **17/17 variables**
+    -   Demographics: 4/4
+    -   HS characteristics: 3/3
+    -   HS accomplishments: 6/6
+    -   Post-secondary: 4/4
+-   The lowest cross-validation error (xerror)
+    -   Step: 12
+    -   xerror: 0.83128
+    -   cp: 9.4667e-04
+    -   splits: 19
+-   Total splits: 1,173
+
+<br>
+
+### Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)) which is 371.
+-   minbucket: round(minsplit / 3) which is 124
+-   cp = 0
+
+<br>
+
+```{r , echo=TRUE}
+maxdepth = 5
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+meaningful.emp.mn.grad.year.5.model.preprune <- rpart(grad.year.5 ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(meaningful.emp.mn.grad.year.5.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$grad.year.5)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(meaningful.emp.mn.grad.year.5.model.preprune)
+
+plotcp(meaningful.emp.mn.grad.year.5.model.preprune)
+
+```
+
+**Takeaways**
+
+-   Accuracy: 62.4% -\> 67.8%
+-   The tree is using **7/17 variables**
+    -   Demographics: 0/4
+    -   HS characteristics: 1/3 - rural-ness
+    -   HS accomplishments: 3/6 - ACT & CTE
+    -   Post-secondary: 3/4 - highest credential, grad location, graduated
+-   The lowest cross-validation error (xerror)
+    -   Step: 7
+    -   xerror: 0.84759
+    -   cp: 0
+    -   splits: 8
+-   Total splits: 8
+
+<br>
+
+### Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- meaningful.emp.mn.grad.year.5.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- meaningful.emp.mn.grad.year.5.model.preprune$cptable[which.min(meaningful.emp.mn.grad.year.5.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+meaningful.emp.mn.grad.year.5.model.postprune <- rpart::prune(meaningful.emp.mn.grad.year.5.model.preprune, cp = cp_1se)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(meaningful.emp.mn.grad.year.5.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$grad.year.5)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(meaningful.emp.mn.grad.year.5.model.postprune)
+
+plotcp(meaningful.emp.mn.grad.year.5.model.postprune)
+```
+
+-   Accuracy: 67.8% -\> 67.8%
+-   The tree is using **6/17 variables**
+    -   Demographics: 0/4
+    -   HS characteristics: 0/3 -
+    -   HS accomplishments: 3/6 - ACT & CTE
+    -   Post-secondary: 3/4 - highest credential, grad location, graduated
+-   The lowest cross-validation error (xerror)
+    -   Step: 5
+    -   xerror: 0.85295
+    -   cp: 0.0037867
+    -   splits: 6
+-   Total splits: 6
+
+So, the accuracy of these are;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model simplifies the model and the accuracy stays the same.. So I'm going to use the post-pruned model here.
+
+```{r}
+#Plot tree
+rpart.plot(meaningful.emp.mn.grad.year.5.model.postprune, nn = TRUE)
+```
+
+### **Main takeaway**
+
+At five years after graduation, **postsecondary completion patterns, credential level, and CTE engagement** become decisive in shaping whether students remain anchored in the region. Graduates with sub-baccalaureate or 2-year credentials, paired with CTE engagement, are most likely to hold meaningful employment in Southern Minnesota. In contrast, **Bachelor’s degree earners and high ACT scorers are more likely to find meaningful work elsewhere in Minnesota**, reflecting mobility tied to higher academic pathways.
+
+### **Key Findings**
+
+-   **Model accuracy:** 67.8% (post-pruned model, 6 splits).
+-   **Most important predictors:** *Postsecondary graduation location*, *Institution sector*, *Highest credential level*, *CTE achievement*, *Total CTE courses taken*, and *ACT Composite Score*.
+-   **Overall pattern:** Regional employment is strongly anchored by **CTE depth** and **sub-baccalaureate completion in local institutions**, while higher academic attainment pushes graduates outward into broader Minnesota labor markets.
+
+### **Interpretation**
+
+-   **Postsecondary location and sector:**
+    -   Graduating from a Minnesota postsecondary institution outside the region strongly predicted statewide (non-regional) employment.
+    -   Public 2-year and other sub-baccalaureate pathways anchored students more securely in the region.
+-   **Highest credential level:** Bachelor’s degree holders were less likely to be employed regionally, reflecting mobility to statewide opportunities.
+-   **CTE engagement:**
+    -   CTE concentrators/completors remained more likely to work regionally.
+    -   Even modest CTE course-taking (≥2 courses) raised the probability of anchoring in the region.
+-   **Academic achievement (ACT):** Very high ACT scores (≥28) aligned with statewide mobility, even among students without deep CTE exposure.
+
+### **Decision Tree Interpretation**
+
+-   **Root split:** Postsecondary graduation location. Graduates from Minnesota institutions outside the region were much more likely to work elsewhere in the state.
+-   **Credential level branch:** Among regional PS graduates, Bachelor’s degree attainment shifted outcomes away from the region, especially without CTE depth.
+-   **CTE engagement branch:** For those without high academic scores, CTE course-taking provided a strong anchor, tipping probabilities toward regional employment.
+-   **Academic branch:** High ACT scorers (≥28) without CTE depth were less likely to remain in regional employment.
+
+### **Summary**
+
+At five years post-graduation, **regional employment is anchored by CTE engagement and sub-baccalaureate completion**, particularly in 2-year institutions. In contrast, **Bachelor’s degree earners and academically high-achieving students are more mobile**, often securing meaningful work elsewhere in Minnesota. This reflects a dual pathway: regional workforce attachment through CTE and 2-year programs versus statewide mobility through 4-year pathways and higher academic achievement.
+
+### **Policy/Practice Implications**
+
+Strengthening **CTE pipelines and sub-baccalaureate pathways** remains critical for anchoring graduates in the regional workforce. Programs that connect CTE concentrators and completers to local employers could bolster retention. Meanwhile, for academically strong students pursuing Bachelor’s degrees, **strategies to attract and retain them regionally—such as internships, research partnerships, and competitive regional opportunities—will be essential to counter the mobility trend**.
+
+## Ten years after graduation
+
+I'm going to follow the same process as the one year after graduation process, but I'm going to add in the post-secondary variables now.
+
+The table below a much more balanced classifications with 58% of the individuals having meaningful employment in their high school region compared to 42% that have meaningful employment in Minnesota, but not their region.
+
+```{r}
+meaningful.emp.mn.grad.year.10 <- data %>%
+  select(-grad.year.1, -grad.year.5) %>%
+  filter(grad.year.10 %in% c("Meaningful emp region", "Meaningful emp MN")) %>%
+  mutate(grad.year.10 = as.factor(grad.year.10))
+
+comma(nrow(meaningful.emp.mn.grad.year.10))
+
+datatable(data = meaningful.emp.mn.grad.year.10 %>%
+            group_by(grad.year.10) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+### Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(meaningful.emp.mn.grad.year.10), nrow(meaningful.emp.mn.grad.year.10) *.7)
+
+train <- meaningful.emp.mn.grad.year.10[sample_ind,]
+
+test <- meaningful.emp.mn.grad.year.10[-sample_ind,]
+
+#Base model
+
+meaningful.emp.mn.grad.year.10.model <- rpart(grad.year.10 ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(meaningful.emp.mn.grad.year.10.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$grad.year.10)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(meaningful.emp.mn.grad.year.10.model)
+
+plotcp(meaningful.emp.mn.grad.year.10.model)
+```
+
+**Key takeaways from base tree results**
+
+-   Accuracy: 60.5%
+-   The tree is using **17/17 variables**
+    -   Demographics: 4/4
+    -   HS characteristics: 3/3
+    -   HS accomplishments: 6/6
+    -   Post-secondary: 4/4
+-   The lowest cross-validation error (xerror)
+    -   Step: 14
+    -   xerror: 0.83580
+    -   cp: 7.9148e-04
+    -   splits: 37
+-   Total splits: 838
+
+<br>
+
+### Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)).
+-   minbucket: round(minsplit / 3)
+-   cp = 0
+
+<br>
+
+```{r , echo=TRUE}
+maxdepth = 5
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+meaningful.emp.mn.grad.year.10.model.preprune <- rpart(grad.year.10 ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(meaningful.emp.mn.grad.year.10.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$grad.year.10)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(meaningful.emp.mn.grad.year.10.model.preprune)
+
+plotcp(meaningful.emp.mn.grad.year.10.model.preprune)
+
+```
+
+**Takeaways**
+
+-   Accuracy: 60.5% -\> 64.7%
+-   The tree is using **7/17 variables**
+    -   Demographics: 0/4
+    -   HS characteristics: 1/3 - wages
+    -   HS accomplishments: 3/6 - ACT, CTE, MCA reading
+    -   Post-secondary: 3/4 - location, institution sector, highest credential
+-   The lowest cross-validation error (xerror)
+    -   Step: 7
+    -   xerror: 0.84185
+    -   cp: 0
+    -   splits: 11
+-   Total splits: 11
+
+<br>
+
+### Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- meaningful.emp.mn.grad.year.10.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- meaningful.emp.mn.grad.year.10.model.preprune$cptable[which.min(meaningful.emp.mn.grad.year.10.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+meaningful.emp.mn.grad.year.10.model.postprune <- rpart::prune(meaningful.emp.mn.grad.year.10.model.preprune, cp = cp_1se)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(meaningful.emp.mn.grad.year.10.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$grad.year.10)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(meaningful.emp.mn.grad.year.10.model.postprune)
+
+plotcp(meaningful.emp.mn.grad.year.10.model.postprune)
+```
+
+-   Accuracy: 64.7% -\> 64.4%
+-   The tree is using **6/17 variables**
+    -   Demographics: 0/4
+    -   HS characteristics: 1/3 - wages
+    -   HS accomplishments: 2/6 - ACT, MCA reading
+    -   Post-secondary: 3/4 - location, institution sector, highest credential
+-   The lowest cross-validation error (xerror)
+    -   Step: 4
+    -   xerror: 0.84976
+    -   cp: 0.0028781
+    -   splits: 8
+-   Total splits: 8
+
+So, the accuracy of these are;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model does simplify the model and has basically the same accuracy.. I'm going to use the post-pruned model here.
+
+```{r}
+#Plot tree
+rpart.plot(meaningful.emp.mn.grad.year.10.model.postprune, nn = TRUE)
+```
+
+### **Main takeaway**
+
+At ten years after graduation, **regional employment is shaped primarily by postsecondary location, credential level, academic performance, and local economic context**. Graduates with sub-baccalaureate or in-region postsecondary experiences remain more anchored to Southern Minnesota, while **Bachelor’s degree earners and higher academic achievers (ACT, MCA)** are much more likely to be employed elsewhere in Minnesota.
+
+### **Key Findings**
+
+-   **Model accuracy:** 64.4% (post-pruned model, 8 splits).
+-   **Most important predictors:** *Postsecondary graduation location*, *Highest credential level*, *Institution sector*, *ACT Composite Score*, *MCA Reading scores*, and *Local wage levels (avg.wages.pct.state)*.
+-   **Overall pattern:** Long-term anchoring to the region is tied to **credential type (especially sub-baccalaureate), regional graduation, and moderate academic performance**, while higher academic achievers and Bachelor’s degree holders show greater outward mobility within Minnesota.
+
+### **Interpretation**
+
+-   **Postsecondary location and credential:**
+    -   Graduating in Southern Minnesota with a sub-baccalaureate credential is one of the strongest anchors for regional employment.
+    -   Postsecondary graduates outside the region and Bachelor’s degree holders are much more likely to be employed statewide rather than regionally.
+-   **Academic achievement:**
+    -   High ACT scores (≥26) are associated with statewide mobility.
+    -   High MCA Reading scores (≥4) similarly point toward statewide opportunities, unless paired with favorable economic conditions and sub-baccalaureate pathways.
+-   **Economic context:**
+    -   Low relative local wages (\<0.79 of state average) increased the likelihood of graduates leaving the region for statewide employment.
+    -   Higher relative wages anchored graduates more strongly in the region, even among higher academic performers.
+
+### **Decision Tree Interpretation**
+
+-   **Root split:** Postsecondary graduation location. Graduates from outside the region or from MN more broadly tended to work outside Southern Minnesota.
+-   **Credential level branch:** Among in-region graduates, earning a Bachelor’s degree shifted employment away from the region.
+-   **Academic performance branch:** High ACT and MCA Reading scores without regional/CTE anchors predicted statewide mobility.\
+-   **Economic branch:** Low local wage environments weakened regional attachment, even for those with moderate credentials, while higher wage environments strengthened regional retention.
+
+### **Summary**
+
+By year ten, **regional employment is anchored by local postsecondary graduation, sub-baccalaureate credentials, and competitive local wages**. In contrast, **Bachelor’s degrees, higher academic achievement, and weaker wage environments lead to statewide mobility**. The split between regional and statewide employment solidifies: students on 2-year or CTE-aligned pathways remain tied to the region, while 4-year graduates and high scorers are drawn outward.
+
+### **Policy/Practice Implications**
+
+To strengthen the long-term regional workforce, policy should emphasize:
+
+-   **Expanding and sustaining CTE and 2-year pipelines** to continue anchoring graduates locally.
+-   **Creating attractive local opportunities for Bachelor’s degree holders and academically high-achieving students**, such as internships, research partnerships, or competitive professional roles, to mitigate outward mobility.
+-   **Supporting wage competitiveness in regional industries** to retain graduates who might otherwise seek higher-paying roles elsewhere in Minnesota.
+
+<br>
+
+# Analysis - Meaningful employment region vs. Not meaningful and not attending post-secondary
+
+## Synthesis: Meaningful Employment in Region vs. Not Meaningful Employment, Not Attending Postsecondary
+
+### **Main takeaway**
+
+Across one, five, and ten years after graduation, the CART models consistently show that **CTE engagement, regional postsecondary pathways, and stronger local economic conditions** are the strongest anchors for meaningful employment in Southern Minnesota. Barriers to regional employment include **lack of CTE involvement, SpecialEd status, low-income status, and weaker wage environments**. Over time, postsecondary ties and economic conditions grow more important, while early-stage anchoring is most dependent on CTE completion and academic preparation.
+
+------------------------------------------------------------------------
+
+### **Year 1 after Graduation**
+
+-   **Accuracy:** 58.6% (post-pruned model).
+-   **Anchors:** CTE concentrator/completor status, stronger MCA Math scores.
+-   **Barriers:** Lack of CTE engagement, SpecialEd involvement, weak math skills, and subgroup gaps (male students in certain racial/ethnic groups).
+-   **Interpretation:** Early anchoring depends heavily on **CTE completion and basic academic preparation**, which provide protection against disconnection from both work and postsecondary education.
+
+------------------------------------------------------------------------
+
+### **Year 5 after Graduation**
+
+-   **Accuracy:** 62.7% (post-pruned model).
+-   **Anchors:** Postsecondary attendance/graduation in Southern MN, CTE completion or participation, and at least one CTE course.
+-   **Barriers:** SpecialEd status, lack of CTE involvement, and subgroup disparities by gender and race/ethnicity.
+-   **Interpretation:** By mid-career, **regional postsecondary ties and CTE pathways** are the strongest predictors of meaningful regional employment. Demographic gaps persist, especially for SpecialEd students and males without CTE depth.
+
+------------------------------------------------------------------------
+
+### **Year 10 after Graduation**
+
+-   **Accuracy:** 65.9% (pre-pruned model).
+-   **Anchors:** Regional postsecondary graduation, ≥2 CTE courses, higher local wages.
+-   **Barriers:** Low-income status, weaker wage contexts, and subgroup disparities (AI, Hispanic, some White students more vulnerable to disconnection).
+-   **Interpretation:** Long-term anchoring is sustained by **regional PS credentials, CTE depth, and competitive wage environments**, while structural disadvantages and weaker economies elevate disconnection risk.
+
+------------------------------------------------------------------------
+
+### **Overall Summary**
+
+The models reveal a clear progression:
+
+-   **Year 1:** Anchoring depends on **early CTE completion and academic readiness (MCA Math)**.
+-   **Year 5:** **Regional postsecondary engagement and CTE depth** take over as decisive anchors, while SpecialEd and subgroup disparities persist as barriers.
+-   **Year 10:** Long-term retention depends on **regional PS graduation, sustained CTE involvement, and wage competitiveness**, with income and racial disparities shaping outcomes.
+
+In short, **CTE and regional postsecondary pathways consistently serve as anchors across all timeframes**, while **economic disadvantage and structural inequities weaken anchoring over time**.
+
+------------------------------------------------------------------------
+
+### **Policy/Practice Implications**
+
+-   **Expand CTE programs and ensure concentrator/completor completion**, as these remain the strongest early and mid-term anchors.
+-   **Strengthen connections to regional postsecondary institutions**, ensuring graduates who attend/complete locally remain tied to the regional labor market.
+-   **Target SpecialEd and low-income students with tailored supports** to improve retention and reduce early disconnection.
+-   **Address racial/ethnic disparities** by ensuring equitable access to CTE, PS, and local employment pipelines.
+-   **Support wage competitiveness in the region**, especially in industries most likely to retain CTE graduates, to reduce long-term disconnection.
+
+<br>
+
+## One year after graduation
+
+First I'm going to filter out the data so only individuals that had meaningful employment in the region or do not have meaningful employment in Minnesota or the region and are not attending post-secondary are in the dataset. In addition, I'm going to remove all the post-secondary variables from the model since those are variables that take place in the future.
+
+The table below shows that 46% of the individuals have meaningful employment in their high school region compared to 55% that do not have meaningful employment in Minnesota or their region and are not attending post-secondary.
+
+```{r}
+not.meaningful.grad.year.1 <- data.grad.year.1 %>%
+  select(-grad.year.5, -grad.year.10) %>%
+  filter(grad.year.1 %in% c("Meaningful emp region", "Not meaningful, not attending ps")) %>%
+  mutate(grad.year.1 = as.factor(grad.year.1))
+
+comma(nrow(not.meaningful.grad.year.1))
+
+datatable(data = not.meaningful.grad.year.1 %>%
+            group_by(grad.year.1) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+### Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(not.meaningful.grad.year.1), nrow(not.meaningful.grad.year.1) *.7)
+
+train <- not.meaningful.grad.year.1[sample_ind,]
+
+test <- not.meaningful.grad.year.1[-sample_ind,]
+
+#Base model
+
+not.meaningful.grad.year.1.model <- rpart(grad.year.1 ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(not.meaningful.grad.year.1.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$grad.year.1)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(not.meaningful.grad.year.1.model)
+
+plotcp(not.meaningful.grad.year.1.model)
+```
+
+**Key takeaways**
+
+-   Accuracy: 54.6%
+-   Predictors: 13/13
+    -   Demographics: 4/4
+    -   HS characteristics: 3/3
+    -   HS Accomplishments: 6/6
+-   Lowest xerror
+    -   Step: 14
+    -   xerror: 0.91239
+    -   cp: 7.0373e-04
+    -   Splits: 49
+-   Total splits: 1,411
+
+<br>
+
+### Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)).
+-   minbucket: round(minsplit / 3)
+-   cp = 0
+
+<br>
+
+```{r, echo=TRUE}
+maxdepth = 5
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+not.meaningful.grad.year.1.model.preprune <- rpart(grad.year.1 ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(not.meaningful.grad.year.1.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$grad.year.1)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(not.meaningful.grad.year.1.model.preprune)
+
+plotcp(not.meaningful.grad.year.1.model.preprune)
+
+summary(train$grad.year.1)
+
+```
+
+-   Accuracy: 54.6% - \> 58.8%
+-   Predictors: 8/13
+    -   Demographics: 4/4
+    -   HS characteristics: 1/3 - wages
+    -   HS Accomplishments: 3/6 - ACT, CTE, MCA math
+-   Lowest xerror
+    -   Step: 5
+    -   xerror: 0.91863
+    -   cp: 0.00035186
+    -   Splits: 9
+-   Total splits: 10
+
+<br>
+
+### Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- not.meaningful.grad.year.1.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- not.meaningful.grad.year.1.model.preprune$cptable[which.min(not.meaningful.grad.year.1.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+not.meaningful.grad.year.1.model.postprune <- rpart::prune(not.meaningful.grad.year.1.model.preprune, cp = cp_1se)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(not.meaningful.grad.year.1.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$grad.year.1)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(not.meaningful.grad.year.1.model.postprune)
+
+plotcp(not.meaningful.grad.year.1.model.postprune)
+```
+
+-   Accuracy: 58.8% -\> 58.6%
+-   Predictors: 5/13
+    -   Demographics: 3/4 - Gender, Race, Special education
+    -   HS characteristics: 0/3
+    -   HS Accomplishments: 2/6 - CTE, MCA math
+-   Lowest xerror
+    -   Step: 3
+    -   xerror: 0.92171
+    -   cp: 0.0042224
+    -   Splits: 5
+-   Total splits: 5
+
+So, the accuracy of these are;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model provides a much simpler model while also retaining the same accuracy. I will use that model.
+
+```{r}
+#Plot tree
+rpart.plot(not.meaningful.grad.year.1.model.postprune, nn = TRUE)
+```
+
+### **Main takeaway**
+
+At one year after graduation, **CTE concentrator/completor status and academic preparation (MCA Math)** are the strongest anchors for meaningful employment in the region. In contrast, lack of CTE engagement, special education status, and weaker math preparation increase the likelihood of being neither meaningfully employed nor attending postsecondary.
+
+### **Key Findings**
+
+-   **Model accuracy:** 58.6% (post-pruned model, 5 splits).
+-   **Most important predictors:** *CTE achievement*, *SpecialEdStatus*, *Gender*, *MCA Math scores*, and *Race/Ethnicity*.
+-   **Overall pattern:** Early anchoring is strongly tied to **CTE completion** and **basic academic preparation**, with demographic factors adding nuance to regional outcomes.
+
+### **Interpretation**
+
+-   **CTE achievement:** Students who completed a CTE program (concentrators/completors) were more likely to be regionally employed. Lack of CTE achievement was the strongest predictor of being in the “not meaningful, not attending PS” group.
+-   **SpecialEdStatus:** Among CTE concentrators/completors, students without SpecialEd status were more often anchored regionally; those with SpecialEd involvement faced higher risk of disconnection.
+-   **Gender and Race/Ethnicity:** Male students, particularly White/Hispanic/Unknown groups, showed higher disconnection risk when combined with low academic performance.
+-   **MCA Math:** Scores ≥3 increased the probability of meaningful regional employment, while weaker math performance tilted outcomes toward disconnection.
+
+### **Decision Tree Interpretation**
+
+-   **Root split:** CTE achievement is the most decisive factor. Without CTE completion, students were substantially more likely to be disconnected.
+-   **SpecialEd branch:** Even among CTE concentrators, SpecialEd status created a barrier to regional employment.
+-   **Gender/Race branch:** Male students in certain racial/ethnic groups were less likely to hold meaningful regional employment, especially with low MCA Math scores.
+-   **Academic branch:** Stronger MCA Math scores offset some of the demographic barriers, anchoring students regionally.
+
+### **Summary**
+
+At one year, **CTE concentrator/completor status is the key anchor for meaningful regional employment**, especially when combined with moderate academic preparation. The main barriers are **lack of CTE engagement, SpecialEd involvement, weaker math skills, and certain gender/racial subgroups**. This points to the importance of early academic and career engagement pathways in preventing disconnection.
+
+### **Policy/Practice Implications**
+
+-   **Expand access to and completion of CTE pathways**, as CTE concentrators show the strongest early anchoring to the regional workforce.
+-   **Provide targeted supports for SpecialEd students** to strengthen their transition into meaningful work.
+-   **Address gender and racial disparities** through mentorship, advising, and employer partnerships focused on retention in regional employment.
+-   **Ensure students achieve basic academic preparation (e.g., math proficiency)** to bolster the anchoring effect of CTE pathways.
+
+<br>
+
+## Five years after high school
+
+First I'm going to filter out the data so only individuals that had meaningful employment in the region or do not have meaningful employment in Minnesota or the region and are not attending post-secondary are in the dataset. This time I'm going to leave in the post-secondary variables.
+
+The table below shows that 61% of the individuals have meaningful employment in their high school region compared to 39% that do not have meaningful employment in Minnesota or their region and are not attending post-secondary.
+
+```{r}
+not.meaningful.grad.year.5 <- data %>%
+  select(-grad.year.1, -grad.year.10) %>%
+  filter(grad.year.5 %in% c("Meaningful emp region", "Not meaningful, not attending ps")) %>%
+  mutate(grad.year.5 = as.factor(grad.year.5))
+
+comma(nrow(not.meaningful.grad.year.5))
+
+datatable(data = not.meaningful.grad.year.5 %>%
+            group_by(grad.year.5) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+### Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(not.meaningful.grad.year.5), nrow(not.meaningful.grad.year.5) *.7)
+
+train <- not.meaningful.grad.year.5[sample_ind,]
+
+test <- not.meaningful.grad.year.5[-sample_ind,]
+
+#Base model
+
+not.meaningful.grad.year.5.model <- rpart(grad.year.5 ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(not.meaningful.grad.year.5.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$grad.year.5)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(not.meaningful.grad.year.5.model)
+
+plotcp(not.meaningful.grad.year.5.model)
+```
+
+**Key takeaways**
+
+-   Accuracy: 57.8%
+-   Predictors: 17/17
+    -   Demographics: 4/4
+    -   HS characteristics: 3/3
+    -   HS Accomplishments: 6/6
+    -   Post-secondary: 4/4
+-   Lowest xerror
+    -   Step: 7
+    -   xerror: 0.93477
+    -   cp: 1.2116e-03
+    -   Splits: 14
+-   Total splits: 1,418
+
+<br>
+
+### Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)).
+-   minbucket: round(minsplit / 3).
+-   cp = 0
+
+<br>
+
+```{r, echo=TRUE}
+maxdepth = 5
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+not.meaningful.grad.year.5.model.preprune <- rpart(grad.year.5 ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(not.meaningful.grad.year.5.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$grad.year.5)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(not.meaningful.grad.year.5.model.preprune)
+
+plotcp(not.meaningful.grad.year.5.model.preprune)
+
+```
+
+**Key takeaways**
+
+-   Accuracy: 57.8% -\> 62.8%
+-   Predictors: 7/17
+    -   Demographics: 3/4 - Gender, Race, Special Education
+    -   HS characteristics: 0/3
+    -   HS Accomplishments: 2/6 - CTE
+    -   Post-secondary: 2/4 - highest credential, grad location
+-   Lowest xerror
+    -   Step: 4
+    -   xerror: 0.93961
+    -   cp: 0.0013570
+    -   Splits: 8
+-   Total splits: 9
+
+<br>
+
+### Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- not.meaningful.grad.year.5.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- not.meaningful.grad.year.5.model.preprune$cptable[which.min(not.meaningful.grad.year.5.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+not.meaningful.grad.year.5.model.postprune <- rpart::prune(not.meaningful.grad.year.5.model.preprune, cp = cp_1se)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(not.meaningful.grad.year.5.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$grad.year.5)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(not.meaningful.grad.year.5.model.postprune)
+
+plotcp(not.meaningful.grad.year.5.model.postprune)
+```
+
+**Key takeaways**
+
+-   Accuracy: 62.8% –\> 62.7%
+-   Predictors: 6/17
+    -   Demographics: 3/4 - Gender, Race, Special Education
+    -   HS characteristics: 0/3
+    -   HS Accomplishments: 2/6 - CTE
+    -   Post-secondary: 1/4 - grad location
+-   Lowest xerror
+    -   Step: 4
+    -   xerror: 0.93961
+    -   cp: 0.0013570
+    -   Splits: 8
+-   Total splits: 8
+
+So, the accuracy of these are;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model provides a simpler modelwhile also retaining the same accuracy. I will dive into that one below.
+
+```{r}
+#Plot tree
+rpart.plot(not.meaningful.grad.year.5.model.postprune, nn = TRUE)
+```
+
+### **Main takeaway**
+
+At five years after graduation, **regional employment is anchored by postsecondary participation/completion in the region and CTE engagement**, while barriers include SpecialEd status, lack of CTE involvement, and weaker subgroup outcomes by gender and race/ethnicity. Postsecondary ties to the region and CTE pathways serve as the clearest protectors against being disconnected from both work and education.
+
+### **Key Findings**
+
+-   **Model accuracy:** 62.7% (post-pruned model, 8 splits).
+-   **Most important predictors:** *Postsecondary location (regional PS)*, *CTE achievement*, *Total CTE courses taken*, *Gender*, *Race/Ethnicity*, and *SpecialEdStatus*.
+-   **Overall pattern:** **Postsecondary engagement and CTE depth** anchor graduates regionally, while **disadvantage markers (SpecialEd, no CTE, subgroup gaps)** increase disconnection risk.
+
+### **Interpretation**
+
+-   **Postsecondary location:** Graduates who attended or graduated from a Southern Minnesota postsecondary institution were far more likely to hold meaningful regional employment.
+-   **CTE achievement:** CTE concentrators/completors and even participants with ≥1 CTE course were more likely to be employed regionally compared to peers with no CTE involvement.
+-   **Race/Ethnicity:** Asian, Pacific Islander, Hispanic, and White students without CTE depth were more likely to fall into the “not meaningful, not attending” group.
+-   **Gender:** Males, especially when not combined with CTE anchors, had higher rates of disconnection.
+-   **SpecialEdStatus:** Special education students continued to face greater disconnection risk at year 5, even with some CTE exposure.
+
+### **Decision Tree Interpretation**
+
+-   **Root split:** Postsecondary location was decisive — regional PS attendance or graduation anchored students strongly to regional employment.
+-   **CTE branch:** Among those without regional PS ties, CTE concentrators/completors were far more likely to work regionally.
+-   **Race/Ethnicity + Gender branches:** Outcomes varied by subgroup, with males and certain racial/ethnic groups showing higher disconnection risk absent CTE anchors.
+-   **SpecialEd branch:** SpecialEd status further separated students toward the “not meaningful, not attending” group, even within CTE subgroups.
+
+### **Summary**
+
+At five years, **regional postsecondary experiences and CTE completion are the strongest anchors for meaningful employment in Southern Minnesota**. Students without CTE involvement, those with SpecialEd status, and certain demographic subgroups face higher risk of disconnection. The combination of **postsecondary ties + CTE depth** creates a powerful pathway into stable regional employment.
+
+### **Policy/Practice Implications**
+
+-   **Expand regional postsecondary opportunities and connections**, as these institutions are the strongest anchors.
+-   **Scale CTE concentrator and completer pathways**, ensuring access for all students.
+-   **Provide additional transition support for SpecialEd students**, linking them with CTE and local employment.
+-   **Address subgroup disparities (gender, race/ethnicity)** by ensuring equitable access to regional PS and CTE programs, alongside mentorship and employer partnerships.
+
+<br>
+
+## Ten years after high school
+
+First I'm going to filter out the data so only individuals that had meaningful employment in the region or do not have meaningful employment in Minnesota or the region and are not attending post-secondary are in the dataset. This time I'm going to leave in the post-secondary variables.
+
+The table below shows that 65% of the individuals have meaningful employment in their high school region compared to 35% that do not have meaningful employment in Minnesota or their region and are not attending post-secondary.
+
+```{r}
+not.meaningful.grad.year.10 <- data %>%
+  select(-grad.year.1, -grad.year.5) %>%
+  filter(grad.year.10 %in% c("Meaningful emp region", "Not meaningful, not attending ps")) %>%
+  mutate(grad.year.10 = as.factor(grad.year.10))
+
+comma(nrow(not.meaningful.grad.year.10))
+
+datatable(data = not.meaningful.grad.year.10 %>%
+            group_by(grad.year.10) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+### Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(not.meaningful.grad.year.10), nrow(not.meaningful.grad.year.10) *.7)
+
+train <- not.meaningful.grad.year.10[sample_ind,]
+
+test <- not.meaningful.grad.year.10[-sample_ind,]
+
+#Base model
+
+not.meaningful.grad.year.10.model <- rpart(grad.year.10 ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(not.meaningful.grad.year.10.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$grad.year.10)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(not.meaningful.grad.year.10.model)
+
+plotcp(not.meaningful.grad.year.10.model)
+```
+
+**Key takeaways**
+
+-   Accuracy: 59.0%
+-   Predictors: 17/17
+    -   Demographics: 4/4
+    -   HS characteristics: 3/3
+    -   HS Accomplishments: 6/6
+    -   Post-secondary: 4/4
+-   Lowest xerror
+    -   Step: 3
+    -   xerror: 0.97853
+    -   cp: 1.9342e-03
+    -   Splits: 9
+-   Total splits: 731
+
+<br>
+
+### Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)).
+-   minbucket: round(minsplit / 3).
+-   cp = 0
+
+<br>
+
+```{r, echo=TRUE}
+maxdepth = 5
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+not.meaningful.grad.year.10.model.preprune <- rpart(grad.year.10 ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(not.meaningful.grad.year.10.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$grad.year.10)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(not.meaningful.grad.year.10.model.preprune)
+
+plotcp(not.meaningful.grad.year.10.model.preprune)
+
+```
+
+**Key takeaways**
+
+-   Accuracy: 59.0% –\> 65.9%
+-   Predictors: 5/17
+    -   Demographics: 2/4 - economic status and race
+    -   HS characteristics: 1/3 - wages
+    -   HS Accomplishments: 1/6 - CTE
+    -   Post-secondary: 1/4 - grad location
+-   Lowest xerror
+    -   Step: 2
+    -   xerror: 0.98008
+    -   cp: 0
+    -   Splits: 6
+-   Total splits: 6
+
+<br>
+
+### Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- not.meaningful.grad.year.10.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- not.meaningful.grad.year.10.model.preprune$cptable[which.min(not.meaningful.grad.year.10.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+not.meaningful.grad.year.10.model.postprune <- rpart::prune(not.meaningful.grad.year.10.model.preprune, cp = 0.0017764)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(not.meaningful.grad.year.10.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$grad.year.10)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(not.meaningful.grad.year.10.model.postprune)
+
+plotcp(not.meaningful.grad.year.10.model.postprune)
+```
+
+**Key takeaways**
+
+-   Accuracy: 65.9% –\> 65.9%
+-   Predictors: 5/17
+    -   Demographics: 2/4 - economic status and race
+    -   HS characteristics: 1/3 - wages
+    -   HS Accomplishments: 1/6 - CTE
+    -   Post-secondary: 1/4 - grad location
+-   Lowest xerror
+    -   Step: 2
+    -   xerror: 0.98008
+    -   cp: 0
+    -   Splits: 6
+-   Total splits: 6
+
+So, the accuracy of these are clear;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model is the same as the pre-pruned so I will use pre-pruned.
+
+```{r}
+#Plot tree
+rpart.plot(not.meaningful.grad.year.10.model.preprune, nn = TRUE)
+```
+
+### **Main takeaway**
+
+At ten years after graduation, **regional postsecondary completion, CTE engagement, and favorable wage environments** are the strongest anchors for meaningful employment in Southern Minnesota. Economic disadvantage and weaker wage contexts raise the risk of being neither meaningfully employed nor in postsecondary, while racial/ethnic gaps remain visible.
+
+### **Key Findings**
+
+-   **Model accuracy:** 65.9% (pre-pruned model, 6 splits).
+-   **Most important predictors:** *Postsecondary graduation in the region*, *Total CTE courses taken*, *Economic status*, *Race/Ethnicity*, and *Local wage levels (avg.wages.pct.state)*.
+-   **Overall pattern:** Regional anchoring is sustained by **local PS graduation and CTE depth**, while **low-income status, weaker wage environments, and subgroup disparities** increase disconnection risk.
+
+### **Interpretation**
+
+-   **Postsecondary graduation in the region:** The single strongest anchor for regional employment. Graduates of Southern MN institutions were far more likely to remain employed in the region.
+-   **CTE course-taking:** Students with ≥2 CTE courses were substantially more likely to hold meaningful regional employment compared to peers with limited or no CTE engagement.
+-   **Economic status:** Low-income graduates were at greater risk of disconnection, even when paired with regional PS or CTE pathways.
+-   **Race/Ethnicity:** American Indian, Hispanic, and some White graduates showed higher likelihood of disconnection in lower-wage environments, while Asian/PI and White graduates with stronger economic status retained more regional attachment.
+-   **Local wages:** Communities with wages ≥79% of the statewide average were more successful in anchoring graduates regionally.
+
+### **Decision Tree Interpretation**
+
+-   **Root split:** Postsecondary graduation in Southern MN is the strongest determinant of regional employment.
+-   **CTE branch:** Among those without local PS ties, CTE depth (≥2 courses) played a decisive role in anchoring students to regional employment.
+-   **Economic branch:** Low-income status pushed students toward disconnection, even when they had CTE experience.
+-   **Wage branch:** Higher local wage environments buffered against disconnection, reinforcing retention among CTE-engaged graduates.
+-   **Race/Ethnicity branch:** Subgroup variation highlights structural disparities, with certain groups more vulnerable to disconnection without strong academic or economic anchors.
+
+### **Summary**
+
+At year ten, **regional postsecondary graduation, CTE engagement, and strong wage environments** are the most consistent anchors for meaningful employment in Southern Minnesota. Barriers include **economic disadvantage, weaker wage contexts, and persistent racial/ethnic gaps**. While CTE depth provides a protective effect, these structural factors shape long-term disconnection risk.
+
+### **Policy/Practice Implications**
+
+-   **Strengthen partnerships with regional postsecondary institutions** to anchor graduates locally through degree completion.
+-   **Expand CTE opportunities and depth (≥2 courses)** as a long-term anchor for regional employment.
+-   **Address income disparities** by providing targeted supports for low-income students in both CTE and postsecondary pathways.
+-   **Support wage competitiveness** in regional industries to prevent graduates from leaving the labor force or seeking opportunities outside the region.
+-   **Target interventions for vulnerable racial/ethnic groups** to reduce disparities in long-term disconnection.
+
+<br>
+
+# Analysis - Meaningful employment region vs. No MN employment record and not attending post-secondary
+
+<br>
+
+## Synthesis: Meaningful Employment in Region vs. No MN Employment Record, Not Attending Postsecondary
+
+### **Main takeaway**
+
+Across one, five, and ten years after graduation, the CART models highlight **regional postsecondary graduation, CTE engagement, and moderate academic preparation** as the most consistent anchors for meaningful employment in Southern Minnesota. Barriers to regional attachment include **weak academic scores, lack of CTE depth, no regional PS ties, and structural inequities**. Over time, postsecondary pathways and CTE depth grow in importance, while low academic readiness continues to heighten long-term disconnection risk.
+
+------------------------------------------------------------------------
+
+### **Year 1 after Graduation**
+
+-   **Accuracy:** 65.9% (post-pruned model).
+-   **Anchors:** ≥2 CTE courses, moderate MCA Math scores, absence of SpecialEd status, stronger local labor markets.
+-   **Barriers:** Lack of CTE depth, SpecialEd status, weak math/ACT performance.
+-   **Interpretation:** Early anchoring is overwhelmingly tied to **CTE course depth**, with even modest academic readiness reinforcing attachment to the regional workforce.
+
+------------------------------------------------------------------------
+
+### **Year 5 after Graduation**
+
+-   **Accuracy:** 67.1% (post-pruned model).
+-   **Anchors:** Regional PS attendance/graduation, ≥2 CTE courses (especially ≥5), sub-baccalaureate credentials (associate’s, some college), ACT ≥25.
+-   **Barriers:** Lack of PS ties, higher MCA Reading scores without CTE, absence of credential completion.
+-   **Interpretation:** By mid-career, **regional PS pathways and CTE depth** are the most decisive anchors. Academic high achievers without regional PS or CTE anchors are more likely to show no MN employment record.
+
+------------------------------------------------------------------------
+
+### **Year 10 after Graduation**
+
+-   **Accuracy:** 62.6% (post-pruned model).
+-   **Anchors:** Regional PS graduation, ≥2 CTE courses, moderate MCA Reading scores, ACT ≥23.
+-   **Barriers:** No PS graduation, lack of CTE engagement, ACT \<23, subgroup disparities.
+-   **Interpretation:** Long-term retention depends on **regional PS graduation and CTE engagement**, supported by moderate academic performance. Weak academic readiness combined with no PS/CTE ties predicts the highest disconnection risk.
+
+------------------------------------------------------------------------
+
+### **Overall Summary**
+
+The models trace a clear trajectory of anchors and barriers:
+
+-   **Year 1:** **CTE depth + academic readiness** are critical for early anchoring.
+-   **Year 5:** **Regional PS engagement + sub-baccalaureate credentials** emerge as central anchors, with CTE depth still protective.
+-   **Year 10:** **Regional PS graduation and sustained CTE involvement** remain decisive for long-term retention, while weak academic scores and no PS ties predict disconnection.
+
+Taken together, the results underscore that **regional postsecondary pathways and CTE depth form the backbone of long-term workforce attachment**, while academic high achievers without these anchors and students with weak readiness face heightened risk of disconnection.
+
+------------------------------------------------------------------------
+
+### **Policy/Practice Implications**
+
+-   **Expand CTE opportunities with emphasis on depth (≥2–5 courses)** to strengthen early and long-term anchoring.
+-   **Strengthen partnerships with regional postsecondary institutions**, ensuring more graduates complete credentials locally.
+-   **Support sub-baccalaureate pathways** (associate’s, certificates) as strong anchors to the regional workforce.
+-   **Provide interventions for low academic scorers (ACT \<23, low MCA Math/Reading)** to connect them to CTE and PS pathways that offset disconnection risk.
+-   **Address racial/ethnic disparities** in long-term workforce attachment by ensuring equitable access to CTE, PS, and local employment opportunities.
+
+<br>
+
+## One year after graduation
+
+First I'm going to filter out the data so only individuals that had meaningful employment in the region or do not have a Minnesota employment record and are not attending post-secondary are in the dataset. In addition, I'm going to remove all the post-secondary variables from the model since those are variables that take place in the future.
+
+The table below shows that 58% of the individuals have meaningful employment in their high school region compared to 42% that do not have a Minnesota employment record and are not attending post-secondary.
+
+```{r}
+no.mn.emp.grad.year.1 <- data.grad.year.1 %>%
+  select(-grad.year.5, -grad.year.10) %>%
+  filter(grad.year.1 %in% c("Meaningful emp region", "No MN emp record, not attending ps")) %>%
+  mutate(grad.year.1 = as.factor(grad.year.1))
+
+comma(nrow(no.mn.emp.grad.year.1))
+
+datatable(data = no.mn.emp.grad.year.1 %>%
+            group_by(grad.year.1) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+### Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(no.mn.emp.grad.year.1), nrow(no.mn.emp.grad.year.1) *.7)
+
+train <- no.mn.emp.grad.year.1[sample_ind,]
+
+test <- no.mn.emp.grad.year.1[-sample_ind,]
+
+#Base model
+
+no.mn.emp.grad.year.1.model <- rpart(grad.year.1 ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(no.mn.emp.grad.year.1.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$grad.year.1)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(no.mn.emp.grad.year.1.model)
+
+plotcp(no.mn.emp.grad.year.1.model)
+```
+
+**Key takeaways**
+
+-   Accuracy: 61.9%
+-   Predictors: 13/13
+    -   Demographics: 4/4
+    -   HS characteristics: 3/3
+    -   HS Accomplishments: 6/6
+-   Lowest xerror
+    -   Step: 16
+    -   xerror: 0.82629
+    -   cp: 7.6880e-04
+    -   Splits: 40
+-   Total splits: 990
+
+<br>
+
+### Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)).
+-   minbucket: round(minsplit / 3).
+-   cp = 0
+
+<br>
+
+```{r, echo=TRUE}
+maxdepth = 5
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+no.mn.emp.grad.year.1.model.preprune <- rpart(grad.year.1 ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(no.mn.emp.grad.year.1.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$grad.year.1)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(no.mn.emp.grad.year.1.model.preprune)
+
+plotcp(no.mn.emp.grad.year.1.model.preprune)
+```
+
+**Key takeaways**
+
+-   Accuracy: 61.9% –\> 66.3%
+-   Predictors: 8/13
+    -   Demographics: 2/4 - Race, Special education
+    -   HS characteristics: 2/3 - unemployment, rural-ness
+    -   HS Accomplishments: 4/6 - ACT, MCA, CTE
+-   Lowest xerror
+    -   Step: 7
+    -   xerror: 0.82836
+    -   cp: 0.0013960
+    -   Splits: 10
+-   Total splits: 13
+
+<br>
+
+### Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- no.mn.emp.grad.year.1.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- no.mn.emp.grad.year.1.model.preprune$cptable[which.min(no.mn.emp.grad.year.1.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+no.mn.emp.grad.year.1.model.postprune <- rpart::prune(no.mn.emp.grad.year.1.model.preprune, cp = cp_1se)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(no.mn.emp.grad.year.1.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$grad.year.1)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(no.mn.emp.grad.year.1.model.postprune)
+
+plotcp(no.mn.emp.grad.year.1.model.postprune)
+```
+
+**Key takeaways**
+
+-   Accuracy: 66.3% –\> 65.9%
+-   Predictors: 5/13
+    -   Demographics: 1/4 - Special education
+    -   HS characteristics: 1/3 - unemployment,
+    -   HS Accomplishments: 3/6 - ACT, MCA, CTE
+-   Lowest xerror
+    -   Step: 6
+    -   xerror: 0.83163
+    -   cp: 0.0025492
+    -   Splits: 8
+-   Total splits: 8
+
+So, the accuracy of these are;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model provides a simpler model while also giving relatively similar accuracy. I will dive into that one below.
+
+```{r}
+#Plot tree
+rpart.plot(no.mn.emp.grad.year.1.model.postprune, nn = TRUE)
+```
+
+### **Main takeaway**
+
+At one year after graduation, **CTE course-taking is the most decisive anchor for meaningful employment in the region**, supported by stronger math performance and absence of SpecialEd status. In contrast, low academic performance, lack of CTE depth, and weaker local labor markets increase the likelihood of having no Minnesota employment record and not attending postsecondary.
+
+### **Key Findings**
+
+-   **Model accuracy:** 65.9% (post-pruned model, 8 splits).
+-   **Most important predictors:** *Total CTE courses taken*, *SpecialEdStatus*, *MCA Math scores*, *ACT Composite Score*, and *Local unemployment rate*.
+-   **Overall pattern:** Students with **≥2 CTE courses, moderate academic scores, and no SpecialEd involvement** were strongly anchored to meaningful regional employment.
+
+### **Interpretation**
+
+-   **CTE course-taking:**
+    -   Root split: Students with ≥2 CTE courses were far more likely to be anchored regionally.
+    -   Additional depth (≥5 courses) paired with moderate MCA Math scores further strengthened regional attachment.
+-   **SpecialEdStatus:**
+    -   Among students with CTE depth, SpecialEd status reduced the likelihood of regional employment and increased disconnection risk.
+-   **Academic achievement:**
+    -   Higher MCA Math scores (≥2) combined with deeper CTE involvement predicted stronger regional employment.
+    -   ACT scores \<28, especially when combined with low CTE engagement, increased the risk of no employment record.
+-   **Economic context:**
+    -   Students in areas with low unemployment (\<4.9%) were somewhat more likely to anchor regionally if they had some CTE engagement.
+
+### **Decision Tree Interpretation**
+
+-   **Root split:** CTE depth (≥2 courses) was the most decisive anchor for regional employment.
+-   **SpecialEd branch:** SpecialEd involvement weakened the anchoring effect of CTE depth.
+-   **Academic branch:** Moderate MCA Math performance and higher ACT scores aligned with regional employment; weaker scores increased disconnection.
+-   **Economic branch:** Local unemployment rate shaped outcomes among students with limited CTE engagement, with stronger local economies anchoring more students regionally.
+
+### **Summary**
+
+At one year, **CTE depth is the single most powerful anchor for meaningful employment in the region**. Students with ≥2 CTE courses and moderate academic preparation are strongly retained in the regional workforce. **SpecialEd involvement, lack of CTE, weak math skills, and lower ACT scores** increase the risk of having no Minnesota employment record and not attending postsecondary.
+
+### **Policy/Practice Implications**
+
+-   **Prioritize CTE course-taking depth (≥2 courses)** to anchor graduates early into the regional workforce.
+-   **Provide targeted supports for SpecialEd students**, ensuring they can fully leverage CTE pathways.
+-   **Bolster academic readiness in math**, as even moderate MCA Math proficiency strengthens the anchoring effect of CTE.
+-   **Support regions with weaker labor markets**, as unemployment rates influence early workforce attachment.
+
+<br>
+
+## Five years after graduation
+
+First I'm going to filter out the data so only individuals that had meaningful employment in the region or do not have a Minnesota employment record and are not attending post-secondary are in the dataset. In addition, I'm going to now include all the post-secondary variables.
+
+The table below shows that 57% of the individuals have meaningful employment in their high school region compared to 43% that do not have a Minnesota employment record and are not attending post-secondary.
+
+```{r}
+no.mn.emp.grad.year.5 <- data %>%
+  select(-grad.year.1, -grad.year.10) %>%
+  filter(grad.year.5 %in% c("Meaningful emp region", "No MN emp record, not attending ps")) %>%
+  mutate(grad.year.5 = as.factor(grad.year.5))
+
+comma(nrow(no.mn.emp.grad.year.5))
+
+datatable(data = no.mn.emp.grad.year.5 %>%
+            group_by(grad.year.5) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+### Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(no.mn.emp.grad.year.5), nrow(no.mn.emp.grad.year.5) *.7)
+
+train <- no.mn.emp.grad.year.5[sample_ind,]
+
+test <- no.mn.emp.grad.year.5[-sample_ind,]
+
+#Base model
+
+no.mn.emp.grad.year.5.model <- rpart(grad.year.5 ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(no.mn.emp.grad.year.5.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$grad.year.5)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(no.mn.emp.grad.year.5.model)
+
+plotcp(no.mn.emp.grad.year.5.model)
+```
+
+**Key takeaways**
+
+-   Accuracy: 64.6%
+-   Predictors: 17/17
+    -   Demographics: 4/4
+    -   HS characteristics: 3/3
+    -   HS Accomplishments: 6/6
+    -   Post-secondary: 4/4
+-   Lowest xerror
+    -   Step: 33
+    -   xerror: 0.74291
+    -   cp: 3.6054e-04
+    -   Splits: 135
+-   Total splits: 1,245
+
+<br>
+
+### Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)).
+-   minbucket: round(minsplit / 3).
+-   cp = 0
+
+<br>
+
+```{r, echo=TRUE}
+maxdepth = 6
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+no.mn.emp.grad.year.5.model.preprune <- rpart(grad.year.5 ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(no.mn.emp.grad.year.5.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$grad.year.5)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(no.mn.emp.grad.year.5.model.preprune)
+
+plotcp(no.mn.emp.grad.year.5.model.preprune)
+```
+
+**Key takeaways**
+
+-   Accuracy: 64.6% –\> 67.6%
+-   Predictors: 8/17
+    -   Demographics: 1/4 - Race & Ethnicity
+    -   HS characteristics: 0/3
+    -   HS Accomplishments: 4/6 - ACT, MCA, CTE
+    -   Post-secondary: 3/4 - grad location, institution type, credential
+-   Lowest xerror
+    -   Step: 8
+    -   xerror: 0.76562
+    -   cp: 0.00066561
+    -   Splits: 11
+-   Total splits: 16
+
+<br>
+
+### Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- no.mn.emp.grad.year.5.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- no.mn.emp.grad.year.5.model.preprune$cptable[which.min(no.mn.emp.grad.year.5.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+no.mn.emp.grad.year.5.model.postprune <- rpart::prune(no.mn.emp.grad.year.5.model.preprune, cp = cp_1se)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(no.mn.emp.grad.year.5.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$grad.year.5)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(no.mn.emp.grad.year.5.model.postprune)
+
+plotcp(no.mn.emp.grad.year.5.model.postprune)
+```
+
+**Key takeaways**
+
+-   Accuracy: 67.6% –\> 67.1%
+-   Predictors: 5/17
+    -   Demographics: 0/4 - Race & Ethnicity
+    -   HS characteristics: 0/3
+    -   HS Accomplishments: 3/6 - ACT, MCA, CTE
+    -   Post-secondary: 2/4 - grad location, credential
+-   Lowest xerror
+    -   Step: 7
+    -   xerror: 0.76970
+    -   cp: 0.0020384
+    -   Splits: 9
+-   Total splits: 9
+
+So, the accuracy of these are;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model provides a simpler model without sacrificing much accuracy. I will go with post-pruned.
+
+```{r}
+#Plot tree
+rpart.plot(no.mn.emp.grad.year.5.model.postprune, nn = TRUE)
+```
+
+### **Main takeaway**
+
+At five years after graduation, **regional postsecondary engagement, CTE depth, and sub-baccalaureate credentials** serve as the strongest anchors for meaningful employment in Southern Minnesota. In contrast, weaker academic preparation and absence of postsecondary ties increase the likelihood of graduates having no Minnesota employment record and not attending postsecondary.
+
+### **Key Findings**
+
+-   **Model accuracy:** 67.1% (post-pruned model, 9 splits).
+-   **Most important predictors:** *Postsecondary location*, *Total CTE courses taken*, *Highest credential level*, *ACT Composite Score*, and *MCA Reading scores*.
+-   **Overall pattern:** Students anchored regionally by **local postsecondary pathways and CTE engagement**, while **academic achievement (ACT, MCA) and 4-year pathways** created greater outward mobility or disconnection.
+
+### **Interpretation**
+
+-   **Postsecondary location:** Attending or graduating from a Southern Minnesota postsecondary institution was the strongest predictor of regional employment at year 5.
+-   **CTE course-taking:** Students with ≥2 CTE courses had much stronger probabilities of regional employment. Additional depth (≥5 courses) further reinforced anchoring.
+-   **Highest credential level:** Sub-baccalaureate credentials (associate’s degree, some college) were most closely tied to regional employment, while 4-year degrees tilted toward disconnection.
+-   **Academic achievement:**
+    -   ACT Composite scores ≥25 anchored students regionally when combined with CTE pathways.
+    -   High MCA Reading scores (≥4) tended to push students outward into statewide mobility, raising the risk of no MN employment record.
+-   **Interaction effects:** CTE depth buffered weaker ACT performance, while lack of CTE combined with higher MCA Reading scores increased disconnection.
+
+### **Decision Tree Interpretation**
+
+-   **Root split:** Postsecondary engagement in the region was the most decisive factor for anchoring.
+-   **CTE branch:** Depth of CTE course-taking strongly improved probabilities of regional employment.
+-   **Credential branch:** Associate’s and sub-baccalaureate credentials predicted regional anchoring, while higher credentials shifted students outward.
+-   **Academic branch:** ACT and MCA scores further shaped pathways, with higher academic achievers more often found in the no-record group unless balanced by CTE or sub-baccalaureate anchors.
+
+### **Summary**
+
+At year 5, **regional postsecondary engagement, CTE depth, and sub-baccalaureate credentials** are the central anchors for meaningful employment in Southern Minnesota. Students without these anchors—especially those with strong academic profiles but no CTE depth—are more likely to lack Minnesota employment records and not attend postsecondary.
+
+### **Policy/Practice Implications**
+
+-   **Expand CTE pathways and ensure access to ≥2 courses**, as depth is highly predictive of regional retention.
+-   **Strengthen connections with regional postsecondary institutions** to secure workforce anchoring through local degree pathways.
+-   **Promote sub-baccalaureate options (associate’s, certificates)** as effective anchors for regional employment.
+-   **Balance pathways for high academic achievers** by creating attractive professional and academic opportunities in the region to reduce disconnection.
+
+<br>
+
+## Ten years after graduation
+
+First I'm going to filter out the data so only individuals that had meaningful employment in the region or do not have a Minnesota employment record and are not attending post-secondary are in the dataset. In addition, I'm going to now include all the post-secondary variables.
+
+The table below shows that 47% of the individuals have meaningful employment in their high school region compared to 53% that do not have a Minnesota employment record and are not attending post-secondary.
+
+```{r}
+no.mn.emp.grad.year.10 <- data %>%
+  select(-grad.year.1, -grad.year.5) %>%
+  filter(grad.year.10 %in% c("Meaningful emp region", "No MN emp record, not attending ps")) %>%
+  mutate(grad.year.10 = as.factor(grad.year.10))
+
+comma(nrow(no.mn.emp.grad.year.10))
+
+datatable(data = no.mn.emp.grad.year.10 %>%
+            group_by(grad.year.10) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+### Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(no.mn.emp.grad.year.10), nrow(no.mn.emp.grad.year.10) *.7)
+
+train <- no.mn.emp.grad.year.10[sample_ind,]
+
+test <- no.mn.emp.grad.year.10[-sample_ind,]
+
+#Base model
+
+no.mn.emp.grad.year.10.model <- rpart(grad.year.10 ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(no.mn.emp.grad.year.10.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$grad.year.10)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(no.mn.emp.grad.year.10.model)
+
+plotcp(no.mn.emp.grad.year.10.model)
+```
+
+**Key takeaways**
+
+-   Accuracy: 59.9%
+-   Predictors: 17/17
+    -   Demographics: 4/4
+    -   HS characteristics: 3/3
+    -   HS Accomplishments: 6/6
+    -   Post-secondary: 4/4
+-   Lowest xerror
+    -   Step: 14
+    -   xerror: 0.75709
+    -   cp: 1.0993e-03
+    -   Splits: 23
+-   Total splits: 1,017
+
+<br>
+
+### Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)).
+-   minbucket: round(minsplit / 3).
+-   cp = 0
+
+<br>
+
+```{r, echo=TRUE}
+maxdepth = 5
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+no.mn.emp.grad.year.10.model.preprune <- rpart(grad.year.10 ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(no.mn.emp.grad.year.10.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$grad.year.10)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(no.mn.emp.grad.year.10.model.preprune)
+
+plotcp(no.mn.emp.grad.year.10.model.preprune)
+```
+
+**Key takeaways**
+
+-   Accuracy: 59.9% –\> 63.3%
+-   Predictors: 5/17
+    -   Demographics: 1/4 - Race
+    -   HS characteristics: 0/3
+    -   HS Accomplishments: 3/6 - MCA, ACT, CTE
+    -   Post-secondary: 1/4 - grad location
+-   Lowest xerror
+    -   Step: 5
+    -   xerror: 0.78800
+    -   cp: 0
+    -   Splits: 7
+-   Total splits: 7
+
+<br>
+
+### Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- no.mn.emp.grad.year.10.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- no.mn.emp.grad.year.10.model.preprune$cptable[which.min(no.mn.emp.grad.year.10.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+no.mn.emp.grad.year.10.model.postprune <- rpart::prune(no.mn.emp.grad.year.10.model.preprune, cp = cp_1se)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(no.mn.emp.grad.year.10.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$grad.year.10)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(no.mn.emp.grad.year.10.model.postprune)
+
+plotcp(no.mn.emp.grad.year.10.model.postprune)
+```
+
+**Key takeaways**
+
+-   Accuracy: 63.3% –\> 62.6%
+-   Predictors: 5/17
+    -   Demographics: 1/4 - Race
+    -   HS characteristics: 0/3
+    -   HS Accomplishments: 3/6 - MCA, ACT, CTE
+    -   Post-secondary: 1/4 - grad location
+-   Lowest xerror
+    -   Step: 4
+    -   xerror: 0.79254
+    -   cp: 0.0040194
+    -   Splits: 6
+-   Total splits: 6
+
+So, the accuracy of these are clear;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model provides a simpler mode and doesn't sacrifice accuracy too much. I'm going with the post-pruned.
+
+```{r}
+#Plot tree
+rpart.plot(no.mn.emp.grad.year.10.model.postprune, nn = TRUE)
+```
+
+### **Main takeaway**
+
+At ten years after graduation, **regional postsecondary graduation, CTE depth, and moderate academic performance** remain the strongest anchors for meaningful employment in Southern Minnesota. In contrast, students without regional PS ties, limited CTE engagement, and weaker academic scores are most at risk of having no Minnesota employment record and not attending postsecondary.
+
+### **Key Findings**
+
+-   **Model accuracy:** 62.6% (post-pruned model, 6 splits).
+-   **Most important predictors:** *Postsecondary location*, *CTE course-taking depth*, *MCA Reading scores*, *ACT Composite Score*, and *Race/Ethnicity*.
+-   **Overall pattern:** Long-term anchoring is shaped by **regional PS credentials and CTE engagement**, while disconnection risk increases for those with weak academic readiness and no local PS ties.
+
+### **Interpretation**
+
+-   **Postsecondary location:** Graduates of Southern Minnesota institutions were far more likely to remain employed regionally, while those without PS graduation faced higher rates of disconnection.
+-   **CTE depth:** Students with ≥2 CTE courses were more likely to anchor regionally, especially when combined with moderate academic performance.
+-   **Academic achievement:**
+    -   High MCA Reading scores (≥4) combined with CTE engagement increased anchoring.
+    -   Very low ACT scores (\<23) predicted disconnection, particularly for students without strong PS or CTE anchors.
+-   **Race/Ethnicity:** Hispanic and White students with stronger MCA Reading preparation showed better regional anchoring; subgroup disparities persisted otherwise.
+
+### **Decision Tree Interpretation**
+
+-   **Root split:** Postsecondary location was the strongest determinant. Those without regional PS graduation were far more likely to have no employment record.
+-   **CTE branch:** Among students without strong PS ties, CTE depth (≥2 courses) offered a significant protective anchor against disconnection.
+-   **Academic branch:** Higher MCA Reading scores and moderate ACT scores supported regional anchoring, while very low ACT scores pushed outcomes toward no record.
+-   **Race/Ethnicity branch:** Some subgroups (Hispanic, White) paired with stronger reading preparation anchored regionally, while others remained more vulnerable to disconnection.
+
+### **Summary**
+
+At ten years, **regional postsecondary graduation and sustained CTE involvement are the strongest long-term anchors for meaningful regional employment**. Students with weak PS ties, limited CTE, and low academic readiness remain most at risk of being disconnected from Minnesota’s workforce and higher education. Persistent racial disparities and academic achievement gaps shape who benefits from these anchors.
+
+### **Policy/Practice Implications**
+
+-   **Deepen partnerships with regional PS institutions** to retain more graduates in the regional workforce.
+-   **Expand opportunities for CTE course depth (≥2 courses)** as a long-term protective factor against disconnection.
+-   **Intervene early for students with low ACT scores**, providing supports that connect them to CTE and local PS opportunities.
+-   **Address racial/ethnic disparities in regional workforce attachment**, ensuring equitable access to CTE, PS, and local job pipelines.
+-   **Sustain programs that integrate academic readiness with CTE pathways**, reinforcing the protective effect of moderate academic performance.
+
+<br>
+
+# Grand Synthesis: Predictive Models of Meaningful Employment in Southern Minnesota
+
+### **Main takeaway**
+
+Across all three binary comparisons and all time horizons (1, 5, and 10 years after graduation), the CART models consistently highlight a **dual pipeline** shaping workforce outcomes in Southern Minnesota:
+
+1.  **Anchors to Regional Employment:**
+    -   **CTE engagement and depth (≥2–5 courses, concentrator/completor status).**
+    -   **Sub-baccalaureate pathways** (2-year credentials, certificates, some college).
+    -   **Regional postsecondary attendance and graduation.**
+    -   **Favorable local economic conditions** (competitive wages, lower unemployment).
+2.  **Pathways to Statewide Mobility or Disconnection:**
+    -   **Bachelor’s degree attainment and high academic achievement** (ACT ≥25–28, MCA Reading ≥4) consistently predict outward mobility into statewide labor markets.
+    -   **Weak academic readiness** (low ACT, low MCA scores) and **lack of CTE engagement** predict disconnection (no record, not attending PS).
+    -   **Structural disadvantages** (low-income, SpecialEd status, some racial/ethnic groups) persistently raise the risk of disconnection across all timeframes.
+
+The synthesis underscores that **CTE and regional postsecondary pathways are the backbone of workforce retention**, while higher academic achievement and 4-year credentials lead to broader mobility. Disadvantaged groups remain at elevated risk of disconnection without targeted supports.
+
+------------------------------------------------------------------------
+
+### **Year 1 after Graduation**
+
+-   **Anchors:** Early anchoring comes primarily from **CTE engagement, math proficiency, and local labor market strength.**
+-   **Barriers:** SpecialEd involvement, weak academic readiness, and lack of CTE drive early disconnection or statewide mobility.
+-   **Interpretation:** At this stage, **exposure to CTE and basic academic preparation** are critical to prevent graduates from being disconnected from work or education.
+
+------------------------------------------------------------------------
+
+### **Year 5 after Graduation**
+
+-   **Anchors:** **Regional postsecondary engagement, CTE depth, and sub-baccalaureate completion** are most decisive.
+-   **Barriers:** 4-year/Bachelor’s attainment predicts mobility out of the region; SpecialEd, gender, and racial disparities continue to shape risks of disconnection.
+-   **Interpretation:** Mid-career, **institutional pathways (regional PS, CTE credentials)** dominate as anchors, while higher academic achievement channels students outward.
+
+------------------------------------------------------------------------
+
+### **Year 10 after Graduation**
+
+-   **Anchors:** Long-term anchoring depends on **regional postsecondary graduation, sustained CTE involvement, and competitive wage environments.**
+-   **Barriers:** Weak academic scores, lack of PS/CTE ties, and subgroup inequities push graduates toward disconnection or employment outside the region.
+-   **Interpretation:** At this stage, outcomes stabilize: **CTE and regional PS pipelines anchor students**, while **4-year pathways and weak local wages reinforce outward movement or disconnection.**
+
+------------------------------------------------------------------------
+
+### **Overall Summary**
+
+The CART analyses converge on three central insights:
+
+1.  **CTE engagement is the most consistent predictor of regional employment.** Even minimal exposure is protective, while concentrator/completor status provides the strongest anchor.
+2.  **Regional postsecondary pathways matter profoundly.** Attendance and completion in Southern Minnesota institutions substantially increase the odds of regional employment at 5 and 10 years.
+3.  **Mobility vs. disconnection split.**
+    -   **Mobility:** High achievers and 4-year graduates are more likely to find meaningful employment statewide.
+    -   **Disconnection:** Students with weak academic readiness, limited CTE, and structural disadvantages face higher risks of no employment record or PS engagement.
+
+This duality reflects a **regional workforce pipeline rooted in CTE and 2-year credentials**, contrasted with a **mobility pipeline driven by academic achievement and 4-year degrees.**
+
+------------------------------------------------------------------------
+
+### **Policy/Practice Implications**
+
+-   **Expand and deepen CTE opportunities**, ensuring more students complete concentrator/completor pathways and take multiple courses (≥2–5).
+-   **Strengthen regional postsecondary connections**, positioning 2-year institutions as central anchors for workforce retention.
+-   **Elevate sub-baccalaureate pathways** as critical contributors to regional workforce strength.
+-   **Design retention strategies for 4-year graduates and high academic achievers**, offering internships, research, and professional opportunities tied to local industries.
+-   **Target supports for vulnerable groups** (low-income, SpecialEd, racial/ethnic subgroups) to reduce disconnection.
+-   **Maintain competitive local wages and employment opportunities** to counter outward mobility and anchor graduates long-term.
+
+In short, the models reaffirm that **Southern Minnesota’s workforce is sustained by CTE and 2-year credentials**, but retaining academically strong and 4-year graduates will require intentional strategies. Meanwhile, **addressing equity gaps and economic competitiveness is essential** to prevent long-term disconnection.

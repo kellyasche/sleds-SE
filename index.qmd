@@ -91,3 +91,74 @@ The postsecondary pipeline is shaped by **two reinforcing forces**:
 In short: **Southern MN’s workforce stability relies heavily on the regional pipeline of 2-year and CTE-driven pathways**, which disproportionately serve low-income and SPED students. Meanwhile, academically strong and advantaged students pursue 4-year and higher credentials, fueling statewide and out-of-state mobility.
 
 **Policy Implication**: To strengthen the regional workforce, interventions should both (1) support disadvantaged students in completing and leveraging their 2-year pathways and (2) create incentives for academically strong students to remain engaged in the region after completing higher degrees.
+
+<br>
+
+## Prediction - Employment CART
+
+### **Main takeaway**
+
+Across all three binary comparisons and all time horizons (1, 5, and 10 years after graduation), the CART models consistently highlight a **dual pipeline** shaping workforce outcomes in Southern Minnesota:
+
+1.  **Anchors to Regional Employment:**
+    -   **CTE engagement and depth (≥2–5 courses, concentrator/completor status).**
+    -   **Sub-baccalaureate pathways** (2-year credentials, certificates, some college).
+    -   **Regional postsecondary attendance and graduation.**
+    -   **Favorable local economic conditions** (competitive wages, lower unemployment).
+2.  **Pathways to Statewide Mobility or Disconnection:**
+    -   **Bachelor’s degree attainment and high academic achievement** (ACT ≥25–28, MCA Reading ≥4) consistently predict outward mobility into statewide labor markets.
+    -   **Weak academic readiness** (low ACT, low MCA scores) and **lack of CTE engagement** predict disconnection (no record, not attending PS).
+    -   **Structural disadvantages** (low-income, SpecialEd status, some racial/ethnic groups) persistently raise the risk of disconnection across all timeframes.
+
+The synthesis underscores that **CTE and regional postsecondary pathways are the backbone of workforce retention**, while higher academic achievement and 4-year credentials lead to broader mobility. Disadvantaged groups remain at elevated risk of disconnection without targeted supports.
+
+------------------------------------------------------------------------
+
+### **Year 1 after Graduation**
+
+-   **Anchors:** Early anchoring comes primarily from **CTE engagement, math proficiency, and local labor market strength.**
+-   **Barriers:** SpecialEd involvement, weak academic readiness, and lack of CTE drive early disconnection or statewide mobility.
+-   **Interpretation:** At this stage, **exposure to CTE and basic academic preparation** are critical to prevent graduates from being disconnected from work or education.
+
+------------------------------------------------------------------------
+
+### **Year 5 after Graduation**
+
+-   **Anchors:** **Regional postsecondary engagement, CTE depth, and sub-baccalaureate completion** are most decisive.
+-   **Barriers:** 4-year/Bachelor’s attainment predicts mobility out of the region; SpecialEd, gender, and racial disparities continue to shape risks of disconnection.
+-   **Interpretation:** Mid-career, **institutional pathways (regional PS, CTE credentials)** dominate as anchors, while higher academic achievement channels students outward.
+
+------------------------------------------------------------------------
+
+### **Year 10 after Graduation**
+
+-   **Anchors:** Long-term anchoring depends on **regional postsecondary graduation, sustained CTE involvement, and competitive wage environments.**
+-   **Barriers:** Weak academic scores, lack of PS/CTE ties, and subgroup inequities push graduates toward disconnection or employment outside the region.
+-   **Interpretation:** At this stage, outcomes stabilize: **CTE and regional PS pipelines anchor students**, while **4-year pathways and weak local wages reinforce outward movement or disconnection.**
+
+------------------------------------------------------------------------
+
+### **Overall Summary**
+
+The CART analyses converge on three central insights:
+
+1.  **CTE engagement is the most consistent predictor of regional employment.** Even minimal exposure is protective, while concentrator/completor status provides the strongest anchor.
+2.  **Regional postsecondary pathways matter profoundly.** Attendance and completion in Southern Minnesota institutions substantially increase the odds of regional employment at 5 and 10 years.
+3.  **Mobility vs. disconnection split.**
+    -   **Mobility:** High achievers and 4-year graduates are more likely to find meaningful employment statewide.
+    -   **Disconnection:** Students with weak academic readiness, limited CTE, and structural disadvantages face higher risks of no employment record or PS engagement.
+
+This duality reflects a **regional workforce pipeline rooted in CTE and 2-year credentials**, contrasted with a **mobility pipeline driven by academic achievement and 4-year degrees.**
+
+------------------------------------------------------------------------
+
+### **Policy/Practice Implications**
+
+-   **Expand and deepen CTE opportunities**, ensuring more students complete concentrator/completor pathways and take multiple courses (≥2–5).
+-   **Strengthen regional postsecondary connections**, positioning 2-year institutions as central anchors for workforce retention.
+-   **Elevate sub-baccalaureate pathways** as critical contributors to regional workforce strength.
+-   **Design retention strategies for 4-year graduates and high academic achievers**, offering internships, research, and professional opportunities tied to local industries.
+-   **Target supports for vulnerable groups** (low-income, SpecialEd, racial/ethnic subgroups) to reduce disconnection.
+-   **Maintain competitive local wages and employment opportunities** to counter outward mobility and anchor graduates long-term.
+
+In short, the models reaffirm that **Southern Minnesota’s workforce is sustained by CTE and 2-year credentials**, but retaining academically strong and 4-year graduates will require intentional strategies. Meanwhile, **addressing equity gaps and economic competitiveness is essential** to prevent long-term disconnection.
