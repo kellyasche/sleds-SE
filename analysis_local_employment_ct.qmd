@@ -364,7 +364,7 @@ In the demographics section we will examine the relationship between that paths 
 **Strength of Association (Cramer's V by Year)**
 
 | Variable | Year 1 V | Year 5 V | Year 10 V | Peak Strength | Pattern of Change |
-|------------|:----------:|:----------:|:----------:|------------|------------|
+|----|:--:|:--:|:--:|----|----|
 | **Gender** | 0.092 | 0.050 | 0.048 | Moderate (Year 1) | Declines over time |
 | **Grad.year.covid** | 0.061 | — | — | Weak (Year 1) | Single-year data only |
 | **Economic Status (FRL)** | 0.260 | 0.121 | 0.083 | Strong (Year 1) | Declines steadily |
@@ -1033,7 +1033,7 @@ We will take a look at the following variables;
 **Strength of Association (Cramer's V or ANOVA F by Year)**
 
 | Variable | Year 1 | Year 5 | Year 10 | Peak Strength | Pattern of Change |
-|------------|:----------:|:----------:|:----------:|------------|------------|
+|----|:--:|:--:|:--:|----|----|
 | **Dem_Desc (rural–urban school mix)** | V = 0.041 | V = 0.046 | V = 0.030 | Weak (Years 1–5) | Small, persistent |
 | **EDR (region of high school)** | V = 0.017 | V = 0.049 | V = 0.055 | Weak (Years 5–10) | Strengthens slightly over time |
 | **Avg. Unemployment Rate (county, HS yrs)** | F = 107.67 | F = 21.66 | F = 58.97 | Strong (Year 1) | Weakens, but resurges at Year 10 |
@@ -1680,7 +1680,7 @@ We are going to analyze the following variables;
 **Strength of Association (Cramer's V or ANOVA F by Year)**
 
 | Variable | Year 1 | Year 5 | Year 10 | Peak Strength | Pattern of Change |
-|------------|:----------:|:----------:|:----------:|------------|------------|
+|----|:--:|:--:|:--:|----|----|
 | **PSEO participation** | V = 0.257 | V = 0.097 | V = 0.071 | Strong (Year 1) | Steady decline |
 | **ACT taken** | V = 0.419 | V = 0.203 | V = 0.123 | Very strong (Year 1) | Declines but significant |
 | **ACT Composite Score** | F = 2177.40 | F = 639.83 | F = 455.79 | Strong (Year 1) | Declines, persists |
@@ -3188,7 +3188,7 @@ We will analyze the following variables;
 **Strength of Association (Cramer's V by Year)**
 
 | Variable | Year 1 V | Year 5 V | Year 10 V | Peak Strength | Pattern of Change |
-|------------|:----------:|:----------:|:----------:|------------|------------|
+|----|:--:|:--:|:--:|----|----|
 | **Attended.ps** | 0.285 | 0.164 | 0.095 | Moderate (Year 1) | Declines steadily |
 | **Ps.grad** | 0.176 | 0.119 | 0.120 | Moderate (Year 1) | Weakens, stabilizes by 10 yrs |
 | **Ps.grad.InstitutionSector** | 0.176 | 0.141 | 0.116 | Moderate (Year 1) | Gradual decline |
@@ -3707,7 +3707,7 @@ Across demographics, high school characteristics, accomplishments, and postsecon
 These variables **consistently show strong or moderate effect sizes** and **clear differences in meaningful regional employment**, making them strong candidates for modeling.
 
 | Variable | Type | Key Insights |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | ps.grad.location | Postsecondary | Strongest predictor of regional employment. Local PS grads most likely to stay; out-of-region grads more mobile/disconnected. |
 | ps.grad | Postsecondary | Graduation itself reduces disconnection and improves both regional and statewide employment. |
 | highest.cred.level | Postsecondary | Sub-baccalaureate grads anchor regionally; higher credentials = statewide mobility. |
@@ -3725,7 +3725,7 @@ These variables **consistently show strong or moderate effect sizes** and **clea
 These variables show **moderate associations** with outcomes. They may be useful in modeling, particularly when combined with other predictors.
 
 | Variable | Type | Key Insights |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | RaceEthnicity | Demographic | Persistent disparities: Black, AI, and Hispanic students more disconnected; Asian students more PS-enrolled/out-of-region. |
 | Gender | Demographic | Early gap: males more regionally employed, females more PS-attending. Gaps narrow over time. |
 | Grad.year.covid | Demographic | Post-COVID grads slightly more disconnected and more likely in local work early on. |
@@ -3741,7 +3741,7 @@ These variables show **moderate associations** with outcomes. They may be useful
 These variables showed **very weak associations** and could be considered for **dropping from modeling**, unless interaction effects suggest added value.
 
 | Variable | Type | Notes |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | english.learner | Demographic | Early differences shrink over time; weak independent effect. |
 | LimitedEnglishProficiencyIndicator | Demographic | Similar to English Learner — overlaps, weak long-term signal. |
 | non.english.home | Demographic | Weak association, may overlap with other variables. |

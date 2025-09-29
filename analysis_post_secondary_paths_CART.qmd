@@ -1,0 +1,824 @@
+---
+title: "Post-secondary Paths CART"
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(sf)
+library(ggrepel)
+library(scales)
+library(shiny)
+library(shinycssloaders)
+library(ggiraph)
+library(kableExtra)
+library(rmapshaper)
+library(cowplot)
+library(DT)
+library(htmlwidgets)
+library(RColorBrewer)
+library(readxl)
+library(janitor)
+library(lubridate)
+library(systemfonts)
+reset_font_cache()
+library(ggtext)
+library(gmodels)
+library(fastDummies)
+library(car)
+library(glmnet)
+library(glmnetUtils)
+library(pscl)
+library(sjPlot)
+library(ggforce)
+library(rpart)
+library(rpart.plot)
+library(tidymodels)
+library(caret)
+library(themis)
+library(ranger)
+```
+
+```{r themes and shapefiles, include=FALSE}
+theme_bar <- theme_bw() +
+  theme(panel.grid.major = element_line(color = "grey70", linewidth  = 0.1),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_text(face = "bold"),
+        panel.border = element_blank(),
+        legend.background = element_rect(fill = "transparent", color = "transparent"),
+        legend.key = element_rect(fill = "transparent"),
+        legend.key.size = unit(1, "lines"),
+        legend.margin = margin(0,0,0,0),
+        legend.title = element_blank(),
+        legend.text = element_text(margin = margin(l = 2)),
+        text = element_text(family = "Arial") ,
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold"))
+
+theme_line <- theme_bw() +
+  theme(legend.background = element_rect(fill = "transparent", color = "transparent"),
+        legend.key = element_rect(fill = "transparent"),
+        legend.text = element_text(margin = margin(l = 2)),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(color = "grey70", linewidth = 0.1),
+        axis.ticks = element_blank(),
+        axis.text = element_text(face = "bold"),
+        panel.border = element_blank(),
+        legend.margin = margin(0,0,0,0),
+        legend.key.size = unit(1, "lines"),
+        text = element_text(family = "Arial") ,
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold"))
+
+
+theme_sf <- theme_bw() +
+  theme(axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_line(color = "white"),
+        panel.border = element_blank(),
+        legend.title = element_blank(),
+        legend.text = element_text(margin = margin(l = 2)),
+        legend.margin = margin(0,0,0,0),
+        legend.key.size = unit(1, "lines"),
+        text = element_text(family = "Arial") ,
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold"))
+
+regions <- read_csv("/Users/kellyasche/Library/CloudStorage/GoogleDrive-kasche@ruralmn.org/My Drive/Data Prep/R Projects/Join docs/county_regions.csv") %>%
+    select(5,6) %>%
+    unique() %>%
+    mutate(edr = str_replace(edr, "  ", " "),
+           planning.region = str_replace(planning.region, " Minnesota", ""),
+           planning.region = fct_relevel(planning.region, "Northwest", "Northeast", "Central", "Seven County Mpls-St Paul", "Southwest", "Southeast"),
+           edr = fct_relevel(edr, "EDR 1 - Northwest", "EDR 2 - Headwaters", "EDR 3 - Arrowhead", "EDR 4 - West Central", "EDR 5 - North Central", "EDR 6E- Southwest Central", "EDR 6W- Upper Minnesota Valley", "EDR 7E- East Central", "EDR 7W- Central", "EDR 8 - Southwest", "EDR 9 - South Central", "EDR 10 - Southeast", "EDR 11 - 7 County Twin Cities", "Minnesota"))
+
+counties.regions <- read_csv("/Users/kellyasche/Library/CloudStorage/GoogleDrive-kasche@ruralmn.org/My Drive/Data Prep/R Projects/Join docs/county_regions.csv") %>%
+  rename(mif = `MIF Region`) %>%
+  mutate(countyfp = formatC(countyfp, width = 3, flag = "0"),
+         Name = str_to_title(Name),
+         Name = str_replace(Name, "Q", "q"),
+         Name = str_replace(Name, "Of The", "of the"),
+         Name = str_replace(Name, "Mcleod", "McLeod"),
+         Dem_Desc = ifelse(Name == "Minnesota", "Minnesota", Dem_Desc) ,
+         edr = str_replace(edr, "  ", " "),
+         planning.region = str_replace(planning.region, " Minnesota", ""),
+         planning.region = fct_relevel(planning.region, "Northwest", "Northeast", "Central", "Seven County Mpls-St Paul", "Southwest", "Southeast"),
+         edr = fct_relevel(edr, "EDR 1 - Northwest", "EDR 2 - Headwaters", "EDR 3 - Arrowhead", "EDR 4 - West Central", "EDR 5 - North Central", "EDR 6E- Southwest Central", "EDR 6W- Upper Minnesota Valley", "EDR 7E- East Central", "EDR 7W- Central", "EDR 8 - Southwest", "EDR 9 - South Central", "EDR 10 - Southeast", "EDR 11 - 7 County Twin Cities", "Minnesota"),
+         Dem_Desc = fct_relevel(Dem_Desc, "Entirely rural", "Town/rural mix", "Urban/town/rural mix", "Entirely urban"))
+
+counties.regions.1 <- counties.regions %>%
+  mutate(statefp = "27",
+         project.pr = ifelse(edr %in% c("EDR 1 - Northwest", "EDR 2 - Headwaters", "EDR 4 - West Central"), "Northwest",
+                             ifelse(edr == "EDR 3 - Arrowhead", "Northeast",
+                                    ifelse(edr %in% c("EDR 5 - North Central", "EDR 7E- East Central", "EDR 7W- Central"), "Central",
+                                           ifelse(edr %in% c("EDR 6E- Southwest Central", "EDR 6W- Upper Minnesota Valley", "EDR 8 - Southwest"), "Southwest",
+                                                  ifelse(edr %in% c("EDR 9 - South Central", "EDR 10 - Southeast"), "Southern", as.character(planning.region)))))),
+         project.pr = fct_relevel(project.pr, "Northwest", "Northeast", "Central", "Seven County Mpls-St Paul", "Southwest", "Southern"))
+
+
+color.ruca <- c("Entirely rural" = "#009933", "Town/rural mix" = "#99CC33", "Urban/town/rural mix" = "#CC9966", "Entirely urban" = "#754C29", "Minnesota" = "black")
+
+color.pr <- c("Northwest" = 	"#4575b4", "Northeast" = "grey", "Central" = "#fee090", "Seven County Mpls-St Paul" = "#d73027", "Southwest" = "#91bfdb", "Southeast" = "#fc8d59", "Minnesota" = "black")
+
+color.edr <- c("EDR 1 - Northwest" = "#b3cde3", "EDR 2 - Headwaters" = "#8c96c6", "EDR 3 - Arrowhead" = "#fe9929", "EDR 4 - West Central" = "#8856a7", "EDR 5 - North Central" = "#810f7c", "EDR 6E- Southwest Central" = "#e5f5f9", "EDR 6W- Upper Minnesota Valley" = "#bdc9e1", "EDR 7E- East Central" = "#99d8c9", "EDR 7W- Central" = "#2ca25f", "EDR 8 - Southwest" = "#74a9cf", "EDR 9 - South Central" = "#0570b0", "EDR 10 - Southeast" = "#d7301f", "EDR 11 - 7 County Twin Cities" = "#d8b365", "Minnesota" = "black")
+
+color.edr.simple <- c("EDR 1" = "#b3cde3", "EDR 2" = "#8c96c6", "EDR 3" = "#fe9929", "EDR 4" = "#8856a7", "EDR 5" = "#810f7c", "EDR 6E" = "#e5f5f9", "EDR 6W" = "#bdc9e1", "EDR 7E" = "#99d8c9", "EDR 7W" = "#2ca25f", "EDR 8" = "#74a9cf", "EDR 9" = "#0570b0", "EDR 10" = "#d7301f", "EDR 11" = "#d8b365", "Minnesota" = "black")
+
+color.pr.edr <- c ("Northwest" = "#4575b4","Northeast" = "#e0f3f8", "Central" = "#fee090", "Seven County Mpls-St Paul" = "#d73027", "Southwest" = "#91bfdb", "Southeast" = "#fc8d59", "Minnesota" = "black", "EDR 1 - Northwest" = "#b3cde3", "EDR 2 - Headwaters" = "#8c96c6", "EDR 3 - Arrowhead" = "#fe9929", "EDR 4 - West Central" = "#8856a7", "EDR 5 - North Central" = "#810f7c", "EDR 6E- Southwest Central" = "#e5f5f9", "EDR 6W- Upper Minnesota Valley" = "#bdc9e1", "EDR 7E- East Central" = "#99d8c9", "EDR 7W- Central" = "#2ca25f", "EDR 8 - Southwest" = "#74a9cf", "EDR 9 - South Central" = "#0570b0", "EDR 10 - Southeast" = "#d7301f", "EDR 11 - 7 County Twin Cities" = "#d8b365")
+
+mn_counties <- st_read("/Users/kellyasche/Library/CloudStorage/GoogleDrive-kasche@ruralmn.org/My Drive/Data Prep/R Projects/Shapefiles/County shapefiles/MNCounties_MNDOT.shp", quiet = TRUE) %>%
+  ms_simplify(keep = .01, keep_shapes = TRUE) %>%
+  rename(countyfp = FIPS_CODE)
+```
+
+```{r master}
+master.original <- read_csv("Data/SLEDS/Masters/After analysis/Master-after-ct.csv") %>%
+  mutate(ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector == "1", "Public, 4-year", as.character(ps.grad.InstitutionSector)),
+         ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector == "4", "Public, 2-year", as.character(ps.grad.InstitutionSector)),
+         ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector == "11", "Other", as.character(ps.grad.InstitutionSector)),
+         ps.grad.location = ifelse(ps.grad.location == "PS grad EDR", "PS grad region", ps.grad.location),
+         highest.cred.level = as.factor(highest.cred.level),
+         ps.grad.location = as.factor(ps.grad.location))
+
+kable(names(master.original))
+
+kable(head(master.original))
+```
+
+# Post-secondary Paths
+
+## Introduction
+
+The previous analyses established two central findings. First, **postsecondary experiences are the strongest predictors of long-term employment outcomes in Southern Minnesota**. Where students graduate, whether they complete, the type of institution, and the level of credential earned all consistently shape whether they find meaningful regional employment, move elsewhere, or become disconnected. Second, these postsecondary outcomes are not random; they are strongly conditioned by **demographic background, high school context, and student accomplishments**. In other words, the very pathways that most influence employment are themselves patterned by earlier characteristics.
+
+Taken together, this creates a **dual-pipeline system**. On one side, **CTE engagement, 2-year institutions, and sub-baccalaureate completions** anchor students to the regional workforce, disproportionately drawing from low-income, special education, and rural backgrounds. On the other side, **academic rigor and 4-year+ pathways** open doors to mobility, with higher-scoring and advantaged students more likely to pursue degrees outside the region and build careers beyond Southern Minnesota.
+
+This new stage of analysis turns from relationships to **prediction**.
+
+```{r}
+master <- master.original %>%
+  mutate(ps.grad.location.new = ifelse(ps.grad.location %in% c("PS grad MN", "PS grad outside MN"), "PS grad outside region", as.character(ps.grad.location)),
+         highest.cred.level.new = ifelse(highest.cred.level %in% c("Associate degree", "Less than Associate Degree"), "Associate degree or lower", as.character(highest.cred.level)),
+         highest.cred.level.new = ifelse(highest.cred.level.new %in% c("No college", "Some college"), "Did not graduate ps", as.character(highest.cred.level.new)))
+
+kable(names(master))
+
+kable(head(master))
+```
+
+<br>
+
+## Dependent variables
+
+1.  **`ps.grad.location`**
+    -   Strongest predictor of regional employment.
+    -   Distinguishes clearly between **Southern MN completers (anchored locally)** and **out-of-region completers (mobile/disconnected)**.
+    -   Key to understanding **who stays and who leaves**.
+2.  **`highest.cred.level`**
+    -   Clearest stratifier of opportunity: **associate/sub-associate = regional employment**, **bachelor’s+ = mobility**.
+    -   Provides a direct lens into how educational attainment maps onto workforce outcomes.
+    -   Crucial for policy since it reveals the “tipping point” between staying and leaving.
+3.  **`ps.grad.InstitutionSector`**
+    -   Distinguishes **public 2-year vs. 4-year pathways**.
+    -   Important because **2-year grads disproportionately fuel the regional workforce**, while 4-year grads drive mobility.
+    -   Adds nuance to the credential level analysis.
+4.  **`ps.grad`**
+    -   Foundational but broad: simply shows completion vs. non-completion.
+    -   Powerful predictor of avoiding disconnection, but less detailed than the other three.
+    -   Best treated as a baseline lens that underpins the others.
+
+For this, I'm going to use the first two.
+
+<br>
+
+### Dependent Variable Recoding for CART Analysis
+
+To improve interpretability of the CART results, the original postsecondary outcome variables were recoded into fewer, conceptually meaningful categories. This ensures the models capture the key distinctions that matter most for workforce pathways without being diluted by overly granular categories.
+
+#### 1. Postsecondary Graduation Location (`ps.grad.location`)
+
+-   **Original categories**:
+    -   PS grad region
+    -   PS grad MN
+    -   PS grad outside MN
+    -   Did not graduate PS
+    -   Attending PS
+-   **Recoding approach**:
+    -   Excluded *Attending PS* to focus on completed vs. non-completed pathways.
+    -   Collapsed *PS grad MN* and *PS grad outside MN* into a single category: **PS grad outside region**.
+-   **Final categories**:
+    -   **PS grad region** → Graduated from a postsecondary institution in Southern MN.
+    -   **PS grad outside region** → Graduated from a postsecondary institution elsewhere in Minnesota or outside the state.
+    -   **Did not graduate PS** → Enrolled but did not complete a postsecondary credential.
+-   **Rationale**: This structure highlights the most important distinction for regional employment outcomes: whether graduates complete within Southern MN (anchoring them locally), outside the region (driving mobility), or not at all (linked to disconnection).
+
+#### 2. Highest Credential Earned (`highest.cred.level`)
+
+-   **Original categories**:
+    -   No college
+    -   Some college
+    -   Less than associate degree
+    -   Associate degree
+    -   Bachelor’s degree or higher
+-   **Recoding approach**:
+    -   Collapsed *No college* and *Some college* into **Did not graduate PS**, representing students without a credential.
+    -   Collapsed *Less than associate degree* and *Associate degree* into **Associate degree or less**, representing sub-baccalaureate completions.
+-   **Final categories**:
+    -   **Did not graduate PS** → No formal credential earned.
+    -   **Associate degree or less** → Includes certificates, diplomas, and associate degrees.
+    -   **Bachelor degree or higher** → Represents advanced educational attainment.
+-   **Rationale**: This grouping emphasizes the stepwise distinction between non-completion, sub-baccalaureate pathways (most tied to regional employment), and bachelor’s+ pathways (more strongly tied to statewide or out-of-state mobility).
+
+<br>
+
+## Independent Variables
+
+### 1. Demographics
+
+-   **Economic status** → Strong predictor of both PS enrollment/completion and employment outcomes. Low-income students are key to understanding regional pathways.
+-   **SpecialEdStatus** → Consistent barrier in both PS and employment; heavily represented in regional pathways.
+-   **RaceEthnicity** → Persistent gaps in access, completion, and location of graduation. Helps explain inequities in both mobility and retention.
+-   **Gender** → Early postsecondary enrollment and employment differences; useful for modeling even if gaps narrow later.
+
+### 2. High School Characteristics
+
+-   **Dem_Desc (Rural vs. Metro)** → Strong link to regional attachment; rural students more likely to stay, metro more mobile/disconnected.
+-   **avg.unemp.rate** → Local economic conditions influence both PS location and employment stability.
+-   **avg.wage.pct.state** → Higher local wages reduce disconnection and can anchor students regionally.
+
+### 3. High School Accomplishments
+
+-   **CTE achievement** → Most consistent school-based predictor of regional employment and 2-year PS pathways.
+-   **total.cte.courses.taken** → Continuous measure adds granularity beyond concentrator/completer status.
+-   **ACTCompositeScore** → Strong signal of academic rigor; predicts 4-year+ pathways and mobility.
+-   **MCA Math, Reading, Science** → Reinforce academic readiness dimension; lower scores tied to regional 2-year pathways, higher scores to mobility.
+-   **PSEO participation** → Clear driver of 4-year+ completions and out-of-region graduation.
+
+### De-prioritize / Drop
+
+-   **English learner / LEP / non-English home** → Weak long-term signals; redundant.
+-   **sat.taken** and **took.ACT** → Minimal discriminatory value; not useful for prediction.
+-   **ap.exam** → Overlaps with ACT/MCA and PSEO; weaker independent effect.
+
+<br>
+
+# Methodology
+
+This analysis used **classification and regression trees (CART)** to explore the predictive power of demographic, high school context, and accomplishment variables on postsecondary pathways. CART was selected because it:
+
+-   Handles both categorical and continuous predictors without requiring transformation.
+-   Naturally models nonlinear relationships and interactions between variables.
+-   Produces results that are highly interpretable, with decision rules that can be directly linked back to student pathways.
+
+For each postsecondary dependent variable, the analysis followed a consistent three-step process:
+
+1.  **Distribution Analysis**
+    -   Calculated and visualized the distribution of cases across the recoded categories for each dependent variable.
+    -   Established baseline context and highlighted whether any categories were sparsely populated.
+2.  **Model Estimation**
+    -   Estimated three CART models for each dependent variable:
+        -   **Base model**: A fully grown tree without pruning, providing the maximum possible fit and revealing the most detailed set of splits.
+        -   **Pre-pruned model**: A tree constrained during growth (e.g., limiting maximum depth or minimum split size) to prevent overfitting and to enhance generalizability.
+        -   **Post-pruned model**: A tree first grown to full size, then pruned back using the complexity parameter (CP) and cross-validation results to balance fit and simplicity.
+3.  **Model Selection**
+    -   Compared the three models based on cross-validated classification accuracy, error rates, and interpretability.
+    -   Final model choice prioritized **predictive strength** while also ensuring **clarity and parsimony**—favoring simpler trees when they performed comparably to more complex ones.
+
+This procedure ensured that the final CART models both maximized predictive accuracy and yielded interpretable insights into how student background and high school experiences influence postsecondary pathways most strongly tied to regional workforce outcomes.
+
+<br>
+
+# Analysis - Post secondary location
+
+```{r}
+data <- master %>%
+    select(economic.status, Gender, RaceEthnicity, SpecialEdStatus, Dem_Desc, avg.unemp.rate, avg.wages.pct.state, ACTCompositeScore, pseo.participant, cte.achievement, total.cte.courses.taken, MCA.M, MCA.R, MCA.S, ps.grad.location.new, highest.cred.level.new)
+
+
+kable(names(data))
+
+kable(head(data))
+```
+
+The table below shows that 54% of the individuals did not graduate college, 27% graduated outside their high school region, and only 19% graduated from a college within their region.
+
+```{r}
+ps.grad.location <- data %>%
+  select(-highest.cred.level.new) %>%
+  filter(ps.grad.location.new != "Attending ps") %>%
+  mutate(ps.grad.location.new = as.factor(ps.grad.location.new))
+
+comma(nrow(ps.grad.location))
+
+datatable(data = ps.grad.location %>%
+            group_by(ps.grad.location.new) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+## Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(ps.grad.location), nrow(ps.grad.location) *.7)
+
+train <- ps.grad.location[sample_ind,]
+
+test <- ps.grad.location[-sample_ind,]
+
+#Base model
+
+ps.grad.location.model <- rpart(ps.grad.location.new ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(ps.grad.location.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$ps.grad.location.new)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(ps.grad.location.model)
+
+plotcp(ps.grad.location.model)
+```
+
+**Key takeaways from base tree results**
+
+-   **Accuracy**: 59.3%
+-   **Variables used:** 14/14
+    -   Demographics: 4/4
+    -   HS Characteristics: 3/3
+    -   HS Accomplishments: 7/7
+-   **Lowest cross-validation error:**
+    -   Step: 31
+    -   xerror: 0.81173
+    -   cp: 1.7885e-04
+    -   split: 102
+-   Total splits: 3,028
+
+<br>
+
+## Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)).
+-   minbucket: round(minsplit / 3).
+-   cp = 0
+
+<br>
+
+```{r, echo=TRUE}
+maxdepth = 5
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+ps.grad.location.model.preprune <- rpart(ps.grad.location.new ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(ps.grad.location.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$ps.grad.location.new)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(ps.grad.location.model.preprune)
+
+plotcp(ps.grad.location.model.preprune)
+```
+
+**Key takeaways from base tree results**
+
+-   **Accuracy**: 59.3% –\> 61.7%
+-   **Variables used:** 5/14
+    -   Demographics: 2/4 - Race, economic status
+    -   HS Characteristics: 0/3
+    -   HS Accomplishments: 3/7 - ACT, MCA, PSEO
+-   **Lowest cross-validation error:**
+    -   Step: 6
+    -   xerror: 0.84741
+    -   cp: 0
+    -   split: 7
+-   Total splits: 7
+
+<br>
+
+## Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- ps.grad.location.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- ps.grad.location.model.preprune$cptable[which.min(ps.grad.location.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+ps.grad.location.model.postprune <- rpart::prune(ps.grad.location.model.preprune, cp = cp_1se)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(ps.grad.location.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$ps.grad.location.new)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(ps.grad.location.model.postprune)
+
+plotcp(ps.grad.location.model.postprune)
+```
+
+**Key takeaways from base tree results**
+
+-   **Accuracy**: 61.7% –\> 61.7%
+-   **Variables used:** 5/14
+    -   Demographics: 2/4 - Race, economic status
+    -   HS Characteristics: 0/3
+    -   HS Accomplishments: 3/7 - ACT, MCA, PSEO
+-   **Lowest cross-validation error:**
+    -   Step: 6
+    -   xerror: 0.84741
+    -   cp: 0
+    -   split: 7
+-   Total splits: 7
+
+So, the accuracy of these are;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model is the same as athe pre-pruned's. I will use the pre-pruned model.
+
+```{r}
+#Plot tree
+rpart.plot(ps.grad.location.model.preprune, nn = TRUE)
+```
+
+## **Main Takeaway**
+
+**Model Performance**\
+The pre-pruned tree achieved **61.7% accuracy** with a root node error of **45.8%**. This represents a meaningful improvement over the baseline distribution (where 54.2% of students did not graduate PS) and shows that a relatively small set of predictors can explain important variation in postsecondary graduation location.
+
+**Key Predictors**\
+The most influential predictors retained after pruning were:
+
+-   **MCA Reading (MCA.R)**
+-   **ACT Composite Score**
+-   **Economic Status**
+-   **PSEO Participation**
+-   **Race/Ethnicity**
+
+**Interpretation of Tree Structure**\
+Regional postsecondary graduation was most strongly tied to **moderate academic readiness** combined with **economic disadvantage**. Students with **mid-range ACT scores (≥24)** and **low-income backgrounds** were more likely to complete in the region rather than outside of it. This highlights how regional institutions serve as a key pathway for disadvantaged but academically prepared students.
+
+Conversely, students with **low MCA Reading scores (\<4)** or **low ACT scores (\<24)** were far more likely to not graduate at all, underscoring the role of academic preparation in determining access to completion. Among students with stronger academic scores, **PSEO participation** and **advantaged economic status** pushed them toward completion outside the region, reflecting the mobility pipeline.
+
+**Summary**\
+The CART model indicates that **regional completions cluster among students who combine modest academic readiness with economic disadvantage**, whereas **high scorers and PSEO participants** overwhelmingly complete outside the region. The strongest barrier remains **low academic readiness**, which is heavily associated with not graduating from postsecondary at all.
+
+**Policy Implications**\
+These findings reinforce that **Southern MN’s workforce stability depends on regional postsecondary institutions’ ability to serve low-income students with mid-level academic preparation**. Strengthening supports for these students — such as developmental coursework, wraparound advising, and affordability measures — can improve completion rates and sustain the regional workforce. At the same time, retaining high-achieving students will require **new strategies to connect PSEO participants and bachelor’s-bound students back to local opportunities**, since they are most likely to complete outside the region and enter mobility pathways.
+
+<br>
+
+# Analysis - Highest Credential Earned
+
+The table below shows that 54% of the individuals did not graduate college, 31% graduated with a Bachelor degree or higher, and 15% graduated with an Associate degree or lower.
+
+```{r}
+highest.cred.level <- data %>%
+  select(-ps.grad.location.new) %>%
+  filter(highest.cred.level.new != "Attending ps") %>%
+  mutate(highest.cred.level.new = as.factor(highest.cred.level.new))
+
+comma(nrow(highest.cred.level))
+
+datatable(data = highest.cred.level %>%
+            group_by(highest.cred.level.new) %>%
+            summarize(n = n()) %>%
+            ungroup() %>%
+            mutate(pct = n / sum(n)) %>%
+            ungroup() %>%
+            select(1:3),
+          class = "cell-border stripe", 
+          filter = "top", 
+          rownames = FALSE,
+          options = list(
+            columnDefs = list(list(className = "dt-center", targets = 1:2)))) %>%
+  formatCurrency(2, "", digits = 0) %>%
+  formatPercentage(3, digits = 1)
+```
+
+<br>
+
+## Base Model
+
+I know the base model is going to overfit and provide an overly complex tree due to having a cost penalty of 0. So I'm just going to print the complexity plot in order to see what the appropriate CP would be to minimize xerror.
+
+```{r}
+set.seed(1234)
+
+sample_ind <- sample(nrow(highest.cred.level), nrow(highest.cred.level) *.7)
+
+train <- highest.cred.level[sample_ind,]
+
+test <- highest.cred.level[-sample_ind,]
+
+#Base model
+
+highest.cred.level.model <- rpart(highest.cred.level.new ~ ., data = train, method = "class", control = rpart.control(cp = 0))
+
+# Accuracy
+
+test$pred <- predict(highest.cred.level.model, test, type = "class")
+
+accuracy_base <- mean(test$pred == test$highest.cred.level.new)
+
+percent(accuracy_base, accuracy = .1)
+
+# Examine the complexity plot
+printcp(highest.cred.level.model)
+
+plotcp(highest.cred.level.model)
+```
+
+**Key takeaways from base tree results**
+
+-   **Accuracy**: 63.3%
+-   **Variables used:** 14/14
+    -   Demographics: 4/4
+    -   HS Characteristics: 3/3
+    -   HS Accomplishments: 7/7
+-   **Lowest cross-validation error:**
+    -   Step: 36
+    -   xerror: 0.72247
+    -   cp: 1.7113e-04
+    -   Splits: 127
+-   Total splits: 2,819
+
+<br>
+
+## Pre-pruning
+
+Next, we need to prune. We can either pre-prune or post-prune. We will start with pre-pruning and use each method - max depth, min depth, and min bucket. It's recommended that I start with the following parameters;
+
+-   maxdepth: 5
+-   minsplit: round(2% of nrow(train)).
+-   minbucket: round(minsplit / 3).
+-   cp = 0
+
+<br>
+
+```{r, echo=TRUE}
+maxdepth = 5
+
+minsplit = round(.02*nrow(train))
+
+minbucket = round(minsplit / 3)
+
+highest.cred.level.model.preprune <- rpart(highest.cred.level.new ~ ., data = train, method = "class", 
+                   control = rpart.control(cp = 0, maxdepth = maxdepth, minsplit = minsplit, minbucket = minbucket))
+
+# Accuracy
+
+test$pred <- predict(highest.cred.level.model.preprune, test, type = "class")
+
+accuracy_preprun <- mean(test$pred == test$highest.cred.level.new)
+
+percent(accuracy_preprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(highest.cred.level.model.preprune)
+
+plotcp(highest.cred.level.model.preprune)
+```
+
+**Key takeaways from base tree results**
+
+-   **Accuracy**: 63.3% –\> 64.2%
+-   **Variables used:** 6/14
+    -   Demographics: 2/4 - Race and economic status
+    -   HS Characteristics: 0/3
+    -   HS Accomplishments: 4/7 - ACT, MCA, PSEO, CTE
+-   **Lowest cross-validation error:**
+    -   Step: 6
+    -   xerror: 0.78149
+    -   cp: 0
+    -   Splits: 7
+-   Total splits: 7
+
+<br>
+
+## Post-pruning
+
+The idea here is to allow the decision tree to grow fully and observe the CP value. There are two methods for identifying the CP code;
+
+1.  Use the cp value with the lowest xerror from the base model.
+2.  Use the cp value with the next lowest xerror that is within the standard error.
+
+<br>
+
+```{r , echo=TRUE}
+
+cp_table <- highest.cred.level.model.preprune$cptable
+
+min_xerror <- min(cp_table[, "xerror"])
+min_xerror_se <- cp_table[which.min(cp_table[,"xerror"]), "xstd"]
+
+threshold <- min_xerror + min_xerror_se
+
+one_se_index <- which(cp_table[, "xerror"] <= threshold)[1] 
+
+cp_1se <- cp_table[one_se_index, "CP"]
+
+optimal_cp <- highest.cred.level.model.preprune$cptable[which.min(highest.cred.level.model.preprune$cptable[, "xerror"]), "CP"]
+
+
+# Prune the hr_base_model based on the optimal cp value
+highest.cred.level.model.postprune <- rpart::prune(highest.cred.level.model.preprune, cp = cp_1se)
+
+# Compute the accuracy of the pruned tree
+
+test$pred <- predict(highest.cred.level.model.postprune, test, type = "class")
+
+accuracy_postprun <- mean(test$pred == test$highest.cred.level.new)
+
+percent(accuracy_postprun, accuracy = .1)
+
+# Examine the complexity plot
+printcp(highest.cred.level.model.postprune)
+
+plotcp(highest.cred.level.model.postprune)
+```
+
+**Key takeaways from base tree results**
+
+-   **Accuracy**: 64.2% –\> 64.2%
+-   **Variables used:** 6/14
+    -   Demographics: 2/4 - Race and economic status
+    -   HS Characteristics: 0/3
+    -   HS Accomplishments: 4/7 - ACT, MCA, PSEO, CTE
+-   **Lowest cross-validation error:**
+    -   Step: 6
+    -   xerror: 0.78149
+    -   cp: 0
+    -   Splits: 7
+-   Total splits: 7
+
+So, the accuracy of these are;
+
+-   Base model: `r percent(accuracy_base, accuracy = .1)`
+-   Pre-pruned model: `r percent(accuracy_preprun, accuracy = .1)`
+-   Post-pruned model: `r percent(accuracy_postprun, accuracy = .1)`
+
+The post-pruned model is the same as the pre-pruned's. I will use the pre-pruned model.
+
+```{r}
+#Plot tree
+rpart.plot(highest.cred.level.model.preprune, nn = TRUE)
+```
+
+## **Main Takeaway**
+
+**Model Performance**\
+The pre-pruned tree achieved **64.2% accuracy** with a root node error of **45.9%**. Compared to the baseline distribution (where over half of students did not graduate postsecondary), the model provides a meaningful improvement in classification and highlights the central role of academic readiness and background factors in determining highest credential earned.
+
+**Key Predictors**\
+The most influential predictors retained after pruning were:
+
+-   **MCA Reading (MCA.R)**
+-   **ACT Composite Score**
+-   **Economic Status**
+-   **PSEO Participation**
+-   **Race/Ethnicity**
+-   **Total CTE Courses Taken**
+
+**Interpretation of Tree Structure**\
+Earning a **bachelor’s degree or higher** was most strongly associated with **higher MCA Reading scores (≥4)** and **ACT Composite scores (≥22)**, particularly for **White and Asian/PI students**. Within this group, advantaged students and those who participated in **PSEO** were especially likely to complete at the bachelor’s level or above.
+
+By contrast, students with **low MCA Reading scores** or **ACT scores below 19** were overwhelmingly likely to **not graduate postsecondary**, regardless of other characteristics. Even among students with moderate ACT performance, **fewer CTE courses** was a marker of higher non-completion risk.
+
+Notably, **economic disadvantage** tempered bachelor’s attainment. High scorers who were also low-income were less likely to reach a bachelor’s or higher compared to their more advantaged peers, highlighting persistent inequities in access to advanced credentials.
+
+**Summary**\
+The CART model shows that **academic readiness is the primary gateway to bachelor’s and higher attainment**, while **low academic performance almost guarantees non-completion**. CTE engagement, while generally positive for regional workforce outcomes, was not as strong a driver toward higher credentials—underscoring its role in anchoring students to sub-baccalaureate pathways. Meanwhile, race/ethnicity and economic status continue to stratify opportunities, even among academically prepared students.
+
+**Policy Implications**\
+Strengthening Southern MN’s workforce requires a dual focus:
+
+1.  **Bolster completion among moderate scorers and disadvantaged students** by expanding academic supports, affordability measures, and targeted advising to reduce non-completion.
+2.  **Improve equity at the bachelor’s+ level** by ensuring that high-achieving, low-income, and underrepresented minority students have the resources and pathways to reach advanced credentials.
+3.  **Leverage CTE as a stabilizer**, but pair it with stackable credential opportunities so students anchored locally are not limited to sub-associate outcomes.
+
+In short, **academic readiness remains the strongest predictor of highest credential level**, but without targeted interventions, structural inequities in race and economic status continue to limit who attains bachelor’s and higher degrees.
+
+<br>
+
+# **Grand Synthesis: Predictive Elements of Postsecondary Pathways**
+
+## **Overall Model Performance**
+
+Across both dependent variables — **postsecondary graduation location** and **highest credential earned** — the pre-pruned CART models achieved accuracies of **61.7%** and **64.2%**, respectively. Both represented clear improvements over baseline distributions and showed that a relatively small set of predictors consistently explains meaningful variation in student pathways.
+
+While not capturing all individual-level complexity, these models highlight **distinct sets of academic, demographic, and experiential variables** that shape whether students remain anchored in the Southern MN workforce pipeline or pursue mobility pathways.
+
+## **Key Predictors Across Models**
+
+The following predictors emerged as the most consistently influential:
+
+-   **Academic readiness**: MCA Reading and ACT Composite Score.
+-   **Economic status**: Persistent disadvantages for low-income students.
+-   **Race/Ethnicity**: White and Asian/PI students more likely to reach higher credentials; Black, AI, and Hispanic students more often concentrated in lower or incomplete outcomes.
+-   **PSEO participation**: Steers students toward bachelor’s+ and out-of-region completions.
+-   **CTE engagement (courses taken)**: Reinforces regional and sub-baccalaureate pathways.
+
+These predictors operate in **two clear pipelines** — one driving local attachment through sub-baccalaureate credentials, and one fostering mobility through advanced credentials.
+
+## **Interpretation of Pathways**
+
+### 1. **Graduation Location (ps.grad.location)**
+
+-   **Regional completions** clustered among **economically disadvantaged students with moderate academic readiness**.
+-   **Non-completion** was strongly tied to **low ACT and MCA scores**, often regardless of background.
+-   **High academic readiness and PSEO participation** predicted completions outside the region, fueling mobility pathways.
+
+**Implication**: Regional institutions disproportionately serve disadvantaged students who achieve moderate readiness, while high scorers leave the region for completion.
+
+### 2. **Highest Credential Earned (highest.cred.level)**
+
+-   **Bachelor’s or higher** credentials were most strongly linked to **high MCA and ACT scores**, advantaged status, and **PSEO participation**.
+-   **Non-completion** was almost guaranteed for students with low MCA Reading or ACT scores, even when other factors were favorable.
+-   **Associate or lower credentials** (though less prominent in the tree structure) align with CTE-heavy pathways, serving as stabilizers for the regional workforce.
+
+**Implication**: Academic readiness acts as the primary gateway to bachelor’s+ attainment, but economic and racial inequities remain barriers, even among high scorers.
+
+## **Synthesis of Findings**
+
+Together, the models reinforce the existence of a **dual-pipeline system** in Southern Minnesota:
+
+1.  **Regional Workforce Pipeline**
+    -   Driven by **CTE engagement, associate-or-lower credentials, and regional completions**.
+    -   Anchors students with **economic disadvantage and moderate readiness** into the local labor market.
+    -   Provides workforce stability but limits long-term mobility and earning potential.
+2.  **Mobility Pipeline**
+    -   Driven by **academic rigor, bachelor’s+ attainment, PSEO participation, and out-of-region completions**.
+    -   Attracts **advantaged, high-scoring students**, who are least likely to remain in the region after completion.
+    -   Fuels statewide and out-of-state labor markets more than the local workforce.
+
+## **Policy Implications**
+
+-   **Strengthen regional anchors**: Expand academic and financial supports for disadvantaged, moderate scorers to ensure successful completions in Southern MN institutions.
+-   **Address inequities in bachelor’s+ attainment**: Target resources for high-achieving but low-income and underrepresented students to reduce barriers to advanced credentials.
+-   **Leverage CTE strategically**: Maintain CTE as a stabilizer but ensure stackable pathways to prevent students from being locked into sub-associate outcomes.
+-   **Engage high-achievers locally**: Create incentives and career opportunities that connect PSEO participants and bachelor’s+ completers back to the region to mitigate brain drain.
+
+## **Conclusion**
+
+The predictive analysis confirms that **academic readiness, economic status, and experiential factors like PSEO and CTE are the primary levers shaping postsecondary pathways**. These pathways, in turn, determine whether students are most likely to remain in the Southern MN workforce or pursue mobility.
+
+Ultimately, the models illustrate a **structural duality**: disadvantaged students with modest preparation form the backbone of the regional workforce through 2-year and regional completions, while advantaged high scorers are systematically funneled into statewide mobility. Policy efforts must therefore balance **supporting the regional anchor pipeline** with **developing mechanisms to retain or re-engage mobile students** after higher attainment.
