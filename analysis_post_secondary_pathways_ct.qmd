@@ -32,6 +32,7 @@ library(glmnetUtils)
 library(pscl)
 library(sjPlot)
 library(ggforce)
+library(openxlsx)
 ```
 
 ```{r themes and shapefiles, include=FALSE}
@@ -130,7 +131,7 @@ mn_counties <- st_read("/Users/kellyasche/Library/CloudStorage/GoogleDrive-kasch
 ```
 
 ```{r master}
-master.original <- read_csv("Data/SLEDS/Masters/After analysis/Master-after-ct.csv") %>%
+master.original <- read_csv("Data/SLEDS/Masters/After analysis/Master-final-after-mca.csv") %>%
   mutate(ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector == "1", "Public, 4-year", as.character(ps.grad.InstitutionSector)),
          ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector == "4", "Public, 2-year", as.character(ps.grad.InstitutionSector)),
          ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector == "11", "Other", as.character(ps.grad.InstitutionSector)),
@@ -172,14 +173,38 @@ Each dependent variable has the following categories;
 
 ```{r dependent variable categories}
 data <- master.original %>%
-  select(attended.ps, ps.grad, ps.grad.InstitutionSector, highest.cred.level, ps.grad.location) %>%
-  mutate(across(c("attended.ps":"ps.grad.location"), factor))
-```
+  select(ps.grad, ps.grad.InstitutionSector, highest.cred.level, ps.grad.location) %>%
+  mutate(ps.pathway = case_when(
+    
+    # Never attended or attended but did not graduate
+    highest.cred.level == "Did not graduate ps" & 
+      ps.grad.location == "Did not grad" ~ "Did not graduate ps",
+    highest.cred.level == "No college"         ~ "Did not graduate ps",
+    
+    # Sub-baccalaureate by location
+    highest.cred.level == "Less than Bachelors" & 
+      ps.grad.location == "PS grad region"      ~ "Sub-baccalaureate - region",
+    highest.cred.level == "Less than Bachelors" & 
+      ps.grad.location == "PS grad MN"          ~ "Sub-baccalaureate - MN",
+    highest.cred.level == "Less than Bachelors" & 
+      ps.grad.location == "PS grad outside MN"  ~ "Sub-baccalaureate - outside MN",
+    
+    # Bachelor or higher by location
+    highest.cred.level == "Bachelors or higher" & 
+      ps.grad.location == "PS grad region"      ~ "Bachelor or higher - region",
+    highest.cred.level == "Bachelors or higher" & 
+      ps.grad.location == "PS grad MN"          ~ "Bachelor or higher - MN",
+    highest.cred.level == "Bachelors or higher" & 
+      ps.grad.location == "PS grad outside MN"  ~ "Bachelor or higher - outside MN",
+    
+    # Currently attending - treat as its own category
+    ps.grad.location == "Attending ps"          ~ "Attending ps",
+    highest.cred.level == "Attending ps"        ~ "Attending ps",
+    
+    TRUE ~ NA_character_),
+    across(c("ps.grad":"ps.grad.location"), factor),
+    ps.pathway = fct_relevel(ps.pathway, "Did not graduate ps", "Sub-baccalaureate - region", "Bachelor or higher - region", "Sub-baccalaureate - MN", "Bachelor or higher - MN", "Sub-baccalaureate - outside MN", "Bachelor or higher - outside MN"))
 
-**attended.ps**
-
-```{r echo = FALSE}
-levels(data$attended.ps)
 ```
 
 **ps.grad**
@@ -206,6 +231,14 @@ levels(data$highest.cred.level)
 levels(data$ps.grad.location)
 ```
 
+**ps.pathway**
+
+```{r echo = FALSE}
+levels(data$ps.pathway)
+```
+
+For the `ps.grad` outcomes, we will explore relationships with indpendent variables among the full population. But for the remaining dependent variables, we will subset the population to explore college completers only.
+
 <br>
 
 # Predictors
@@ -218,70 +251,21 @@ For all of these, we will use the predictors that were in Tier 1 and Tier 2 of t
   - `RaceEthnicity`
   - `SpecialEdStatus`
 - High school characteristics
-  - `Dem_Desc`
+  - `edr`
   - `avg.unemp.rate`
-  - `avg.wage.pct.state`
 - High school accomplishments
+  - `took.ACT`
   - `ACTCompositeScore`
-  - `pseo.participant`
-  - `cte.achievement`
-  - `total.cte.courses.taken`
+  - `ap.exam`
   - `MCA.M`
   - `MCA.R`
   - `MCA.S`
+  - `cte.achievement`
+  - `total.cte.courses.taken`
 
-# Attended.ps
+<br>
 
-## Total Summary: Predictors of Postsecondary Attendance (attended.ps)
-
-Across demographics, high school characteristics, and accomplishments, clear patterns emerge in who is most likely to pursue postsecondary education. **Academic achievement and early exposure to postsecondary opportunities are the strongest predictors**, while economic disadvantage and special education needs are the most powerful barriers. High school context measures show weaker associations, suggesting that student-level factors matter more than community background.
-
-------------------------------------------------------------------------
-
-### **1. Strong Predictors of Postsecondary Attendance**
-
-These variables show **strong or moderate associations** and consistently differentiate postsecondary attendance outcomes.
-
-| Variable | Type | Key Insights |
-|----|----|----|
-| MCA Reading, Math, Science | Accomplishment (continuous) | Higher MCA scores strongly predict postsecondary attendance, with Reading the single strongest indicator. |
-| ACTCompositeScore | Accomplishment (continuous) | Higher ACT scores significantly increase likelihood of attending PS. |
-| pseo.participant | Accomplishment (categorical) | Participation in PSEO strongly boosts PS attendance, highlighting the value of early postsecondary exposure. |
-| SpecialEdStatus | Demographic | Students in special education are far less likely to attend PS, making this one of the most powerful barriers. |
-| Economic Status | Demographic | Low-income students are much less likely to attend PS, showing persistent socioeconomic disparities. |
-
-------------------------------------------------------------------------
-
-### **2. Moderate Predictors — Secondary but Meaningful**
-
-These variables show **moderate or weaker effects**, useful for understanding disparities but less decisive than the strongest predictors.
-
-| Variable | Type | Key Insights |
-|----|----|----|
-| RaceEthnicity | Demographic | White and Asian/PI students most likely to attend PS; Black, Hispanic, and American Indian students less likely. |
-| Gender | Demographic | Females somewhat more likely to attend PS than males, but the gap is modest. |
-| total.cte.courses.taken | Accomplishment (continuous) | Taking more CTE courses correlates with higher PS attendance, but effect is modest compared to academics. |
-
-------------------------------------------------------------------------
-
-### **3. Weak or Inconsistent Predictors — Limited Value**
-
-These variables show **weak associations** and are less useful in predicting postsecondary attendance independently.
-
-| Variable | Type | Notes |
-|----|----|----|
-| cte.achievement | Accomplishment (categorical) | Little difference across CTE participants, concentrators, or non-participants in terms of PS attendance. |
-| Dem_Desc | HS Characteristic | Urban, rural, and mixed settings show almost no independent effect on PS attendance. |
-| avg.unemp.rate | HS Characteristic (continuous) | Significant differences observed, but effect size small; stronger economies modestly raise PS attendance. |
-| avg.wages.pct.state | HS Characteristic (continuous) | Higher relative local wages linked to higher PS attendance, though weaker than unemployment rate differences. |
-
-------------------------------------------------------------------------
-
-### **Conclusion**
-
-The most consistent predictors of postsecondary attendance are **academic achievement (MCA and ACT scores)**, **PSEO participation**, and **demographic disadvantages (special education and low-income status)**. **Race, gender, and CTE course-taking add nuance but are secondary factors.** High school context measures such as community type, local unemployment, and local wages matter less than individual-level academic and demographic characteristics.
-
-In short: **academic readiness and early exposure to college drive postsecondary entry**, while **economic disadvantage and special education needs are the greatest barriers**.
+# `ps.grad` - full population
 
 ## Demographics
 
@@ -292,415 +276,19 @@ Here are the variables we will be exploring;
 - `RaceEthnicity`
 - `SpecialEdStatus`
 
-### Cramer’s V Scores and Strength
+**DEMOGRAPHIC VARIABLES AND POSTSECONDARY GRADUATION**
 
-- **SpecialEdStatus**: V = **0.288** → **Moderate-to-Strong association**
-- **Economic Status**: V = **0.218** → **Moderate association**
-- **RaceEthnicity**: V = **0.150** → **Weak-to-Moderate association**
-- **Gender**: V = **0.118** → **Weak association**
+Overall, 46% of graduates in this analysis completed a postsecondary credential, with attending ps graduates excluded. Demographic variables show moderate to strong associations with credential completion, and the patterns are consistent with what was observed in the workforce outcome bivariate stage.
 
-**Ranking (strongest to weakest):**
+Gender shows a meaningful association (φ=0.134). Females complete postsecondary credentials at a substantially higher rate (52.9%) than males (39.5%), a gap of 13.4 percentage points. This is consistent with the Stage 3 finding that females attend postsecondary at higher rates and remain enrolled longer, and confirms that the female postsecondary advantage extends through credential completion.
 
-1.  SpecialEdStatus (0.288)
-2.  Economic Status (0.218)
-3.  RaceEthnicity (0.150)
-4.  Gender (0.118)
+Economic status is a strong predictor of credential completion (φ=0.269). Non-low-income graduates complete at 55.1% compared to just 26.2% for low-income graduates — a gap of nearly 29 percentage points. This is the largest gap of any binary demographic variable and reinforces the Stage 3 finding that economic disadvantage is the most consequential demographic barrier to postsecondary pathway success.
 
-------------------------------------------------------------------------
+Special education status shows a similarly strong association (φ=0.255). Only 14.4% of special education graduates complete a postsecondary credential compared to 51.1% of non-special education graduates — a gap of 36.7 percentage points, the largest absolute gap of any demographic variable examined. This confirms the Stage 3 finding that special education status is associated with dramatically lower postsecondary participation and extends it to show that completion rates are even more severely affected than attendance rates alone would suggest.
 
-### Interpretation of Results
+Race and ethnicity shows the strongest overall association (V=0.299) and substantial variation across groups. White graduates show the highest completion rate (53.1%), followed closely by Asian/PI graduates (51.8%). Black (28.9%), Hispanic (26.0%), and American Indian (14.6%) graduates show substantially lower completion rates. The Unknown category shows a completion rate of only 8.1%, which is anomalously low and likely reflects a data coding artifact or a specific subpopulation rather than a meaningful racial or ethnic group — this category should be interpreted with caution and flagged in any formal reporting. American Indian graduates show the lowest completion rate of any identified racial or ethnic group, though cell sizes remain small (n=553) and estimates should be interpreted cautiously.
 
-- **SpecialEdStatus**: Students in special education are substantially less likely to attend postsecondary. The split is stark: most non-SPED students go on, while nearly two-thirds of SPED students do not. This makes it the most powerful demographic predictor.
-- **Economic Status**: Low-income students are much less likely to attend postsecondary compared to their non-low-income peers. The difference is meaningful but smaller than SPED.
-- **RaceEthnicity**: Attendance patterns vary by group. White and Asian/PI students show the highest participation, while American Indian, Hispanic, and Black students are less likely to attend. Disparities are clear but not as large as the income and SPED gaps.
-- **Gender**: Females are somewhat more likely to attend postsecondary than males, but the effect is weaker compared to other demographics.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-Among demographic factors, **special education status and economic status** are the strongest predictors of postsecondary attendance, both showing moderate effect sizes. **Race/ethnicity** matters, with persistent gaps across groups, but its predictive strength is weaker. **Gender** plays only a minor role, with females more likely to attend but not dramatically so.
-
-In short: **SPED and income disadvantage most strongly limit postsecondary access**, while racial/ethnic disparities and gender patterns play secondary roles.
-
-::: panel-tabset
-### `Gender`
-
-```{r}
-tab_xtab(var.row = master.original$attended.ps,
-         var.col = master.original$Gender,
-         show.exp = TRUE,
-         show.col.prc = TRUE)
-
-master.original %>%
-  select(attended.ps, Gender) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/Demographics/Gender.csv")
-```
-
-### `economic.status`
-
-```{r}
-tab_xtab(var.row = master.original$attended.ps,
-         var.col = master.original$economic.status,
-         show.exp = TRUE,
-         show.col.prc = TRUE)
-
-master.original %>%
-  select(attended.ps, economic.status) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/Demographics/economic-status.csv")
-```
-
-### `RaceEthnicity`
-
-```{r}
-tab_xtab(var.row = master.original$attended.ps,
-         var.col = master.original$RaceEthnicity,
-         show.exp = TRUE,
-         show.col.prc = TRUE)
-
-master.original %>%
-  select(attended.ps, RaceEthnicity) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/Demographics/RaceEthnicity.csv")
-```
-
-### `SpecialEdStatus`
-
-```{r}
-tab_xtab(var.row = master.original$attended.ps,
-         var.col = master.original$SpecialEdStatus,
-         show.exp = TRUE,
-         show.col.prc = TRUE)
-
-master.original %>%
-  select(attended.ps, SpecialEdStatus) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/Demographics/SpecialEdStatus.csv")
-```
-:::
-
-<br>
-
-## High School Characteristics
-
-Here are the variables we will be exploring;
-
-- `Dem_Desc`
-- `avg.unemp.rate`
-- `avg.wage.pct.state`
-
-### Cramer’s V / ANOVA Results
-
-- **Dem_Desc**: V = **0.039** → **Very weak association**
-- **avg.unemp.rate**: F = **484.36**, p \< 0.001 → **Significant difference**, but effect size likely small
-- **avg.wages.pct.state**: F = **269.68**, p \< 0.001 → **Significant difference**, but effect size likely small
-
-**Ranking (strongest to weakest):**
-
-1.  **avg.unemp.rate** (most statistically significant mean difference)
-2.  **avg.wages.pct.state** (significant but smaller than unemployment)
-3.  **Dem_Desc** (essentially negligible association)
-
-------------------------------------------------------------------------
-
-### Interpretation of Results
-
-- **Dem_Desc**: Urban, rural, and mixed community contexts show little independent relationship to postsecondary attendance once other factors are considered. Students from all community types attend at broadly similar rates.
-- **avg.unemp.rate**: Students in counties with lower unemployment rates are significantly more likely to attend postsecondary. This suggests stronger local labor markets reduce immediate employment pressure and encourage PS attendance.
-- **avg.wages.pct.state**: Higher local wages (relative to state average) are also linked to higher PS attendance, though the effect is weaker than unemployment. Better local economic conditions appear to create more postsecondary participation.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-High school context measures show **weak-to-modest associations** with postsecondary attendance. Local economic indicators (unemployment and wages) matter more than rural/urban community type, suggesting **economic opportunity environments** influence whether students pursue college. However, compared to demographic factors like **special education and income status**, these contextual factors are **secondary predictors**.
-
-::: panel-tabset
-### Dem_Desc
-
-```{r}
-tab_xtab(var.row = master.original$attended.ps,
-         var.col = master.original$Dem_Desc,
-         show.exp = TRUE,
-         show.col.prc = TRUE)
-
-master.original %>%
-  select(attended.ps, Dem_Desc) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/High school characteristics/Dem-Desc.csv")
-```
-
-### avg.unemp.rate
-
-```{r}
-summary <- aov(avg.unemp.rate ~ attended.ps, data = master.original)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-master.original %>%
-  select(attended.ps, avg.unemp.rate) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/High school characteristics/avg-unemp-rate.csv")
-
-```
-
-### avg.wage.pct.state
-
-```{r}
-summary <- aov(avg.wages.pct.state ~ attended.ps, data = master.original)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-master.original %>%
-  select(attended.ps, avg.wages.pct.state) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/High school characteristics/avg-wages-pct-state.csv")
-```
-:::
-
-<br>
-
-## High School Accomplishments
-
-Here are the variables we will explore.
-
-- `ACTCompositeScore`
-- `pseo.participant`
-- `cte.achievement`
-- `total.cte.courses.taken`
-- `MCA.M`
-- `MCA.R`
-- `MCA.S`
-
-### Cramer’s V / ANOVA Results
-
-- **pseo.participant**: V = **0.228** → **Moderate association**
-- **cte.achievement**: V = **0.073** → **Weak association**
-- **ACTCompositeScore**: F = **5286.93**, p \< 0.001 → Significant difference (strong effect)
-- **MCA Math**: F = **7002.91**, p \< 0.001 → Significant difference (strong effect)
-- **MCA Reading**: F = **9898.17**, p \< 0.001 → Significant difference (very strong effect)
-- **MCA Science**: F = **6657.59**, p \< 0.001 → Significant difference (strong effect)
-- **total.cte.courses.taken**: F = **1543.33**, p \< 0.001 → Significant difference (modest effect)
-
-**Ranking (strongest to weakest):**
-
-1.  **MCA Reading** (largest F-statistic, strongest signal)
-2.  **MCA Math**
-3.  **MCA Science**
-4.  **ACTCompositeScore**
-5.  **pseo.participant** (categorical, moderate effect)
-6.  **total.cte.courses.taken** (significant but modest effect)
-7.  **cte.achievement** (weak effect)
-
-------------------------------------------------------------------------
-
-### Interpretation of Results
-
-- **MCA Scores (Math, Reading, Science)**: Strong academic performance is the most powerful predictor of postsecondary attendance. Students with higher MCA scores are much more likely to attend PS, with Reading showing the strongest link.
-- **ACTCompositeScore**: Similarly, higher ACT scores strongly predict PS attendance, reinforcing the role of academic achievement.
-- **pseo.participant**: Students who participated in postsecondary enrollment options (PSEO) are significantly more likely to attend PS later. This suggests early exposure to college builds pathways into continued enrollment.
-- **total.cte.courses.taken**: More CTE courses taken correlates with higher PS attendance, though the effect is smaller than academic indicators.
-- **cte.achievement**: Whether a student is a participant, concentrator, or non-participant in CTE has only a weak independent association with PS attendance.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-**Academic rigor measures (MCA and ACT scores) are the strongest predictors of postsecondary attendance**, with Reading showing the largest effect. **PSEO participation** also stands out as a moderate predictor, highlighting the importance of early postsecondary exposure. **CTE engagement (courses taken)** shows some positive association with attendance, but the effect is modest, and categorical CTE achievement alone is weak.
-
-In short: **strong academics and early PS exposure drive college attendance**, while CTE plays a smaller, supporting role.
-
-::: panel-tabset
-### ACTCompositeScore
-
-```{r}
-summary <- aov(ACTCompositeScore ~ attended.ps, data = master.original)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-master.original %>%
-  select(attended.ps, ACTCompositeScore) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/High school accomplishments/ACTCompositeScore.csv")
-```
-
-### pseo.participant
-
-```{r}
-tab_xtab(var.row = master.original$attended.ps,
-         var.col = master.original$pseo.participant,
-         show.exp = TRUE,
-         show.col.prc = TRUE)
-
-master.original %>%
-  select(attended.ps, pseo.participant) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/High school accomplishments/pseo-participant.csv")
-```
-
-### cte.achievement
-
-```{r}
-tab_xtab(var.row = master.original$attended.ps,
-         var.col = master.original$cte.achievement,
-         show.exp = TRUE,
-         show.col.prc = TRUE)
-
-master.original %>%
-  select(attended.ps, cte.achievement) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/High school accomplishments/cte-achievement.csv")
-```
-
-### total.cte.courses.taken
-
-```{r}
-summary <- aov(total.cte.courses.taken ~ attended.ps, data = master.original)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-master.original %>%
-  select(attended.ps, total.cte.courses.taken) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/High school accomplishments/total-cte-courses-taken.csv")
-```
-
-### MCA.M
-
-```{r}
-summary <- aov(MCA.M ~ attended.ps, data = master.original)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-master.original %>%
-  select(attended.ps, MCA.M) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/High school accomplishments/MCA-M.csv")
-```
-
-### MCA.R
-
-```{r}
-  summary <- aov(MCA.R ~ attended.ps, data = master.original)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-master.original %>%
-  select(attended.ps, MCA.R) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/High school accomplishments/MCA-R.csv")
-
-```
-
-### MCA.S
-
-```{r}
-summary <- aov(MCA.S ~ attended.ps, data = master.original)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-master.original %>%
-  select(attended.ps, MCA.S) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Attended ps/High school accomplishments/MCA-S.csv")
-```
-:::
-
-<br>
-
-# ps.grad
-
-## Total Summary: Predictors of Postsecondary Graduation (ps.grad)
-
-Across demographics, high school characteristics, and accomplishments, the clearest pattern is that **academic achievement and demographic disadvantage drive postsecondary completion outcomes**. Strong test performance and higher ACT scores substantially increase graduation odds, while racial/ethnic disparities, income barriers, and special education needs sharply reduce them. High school contextual factors (economic environment, rural/urban setting) play a smaller but still significant role.
-
-------------------------------------------------------------------------
-
-### **1. Strong Predictors of Postsecondary Graduation**
-
-These variables show **moderate-to-strong associations** and consistently differentiate who graduates from postsecondary institutions.
-
-| Variable | Type | Key Insights |
-|----|----|----|
-| RaceEthnicity | Demographic | Largest disparities: White and Asian/PI students graduate at far higher rates than Black, Hispanic, and American Indian peers. |
-| Economic Status | Demographic | Non–low-income students graduate at much higher rates than low-income students, showing persistent socioeconomic barriers. |
-| SpecialEdStatus | Demographic | Students in special education graduate at much lower rates than non-SPED peers. |
-| ACTCompositeScore | Accomplishment (continuous) | Higher ACT scores strongly predict graduation. |
-| MCA Reading, Math, Science | Accomplishment (continuous) | Higher MCA scores strongly predict graduation, with Reading as the single strongest signal. |
-
-------------------------------------------------------------------------
-
-### **2. Moderate Predictors — Secondary but Meaningful**
-
-These variables show **modest effects** on graduation, adding nuance but not as decisive as the strongest predictors.
-
-| Variable | Type | Key Insights |
-|----|----|----|
-| Gender | Demographic | Females more likely to graduate than males, but effect is modest compared to race and income. |
-| total.cte.courses.taken | Accomplishment (continuous) | More CTE coursework modestly increases graduation odds. |
-| cte.achievement | Accomplishment (categorical) | CTE concentrators/completors graduate at slightly higher rates, but overall effect is weak-to-moderate. |
-| avg.unemp.rate | HS Characteristic (continuous) | Lower local unemployment modestly improves graduation rates. |
-| avg.wages.pct.state | HS Characteristic (continuous) | Higher relative local wages modestly improve graduation rates. |
-
-------------------------------------------------------------------------
-
-### **3. Weak or Inconsistent Predictors — Limited Value**
-
-These variables show **weak associations** and add little predictive value independently.
-
-| Variable | Type | Notes |
-|----|----|----|
-| Dem_Desc | HS Characteristic | Community type (urban, rural, mixed) shows negligible independent impact on graduation once other factors are considered. |
-
-------------------------------------------------------------------------
-
-### **Conclusion**
-
-The most consistent predictors of postsecondary graduation are **academic performance (MCA and ACT scores)** and **demographic disadvantages (race/ethnicity, economic status, special education needs)**. Gender and CTE measures add modest explanatory value, while high school context factors like unemployment and wages are statistically significant but secondary.
-
-In short: **graduation depends heavily on academic readiness and overcoming demographic barriers**, with local context and programmatic engagement (CTE) playing smaller supporting roles.
-
-## Demographics
-
-Here are the variables we will be exploring;
-
-- `Gender`
-- `economic.status`
-- `RaceEthnicity`
-- `SpecialEdStatus`
-
-### Cramer’s V Scores and Strength (ps.grad \~ Demographics)
-
-- **RaceEthnicity**: V = **0.299** → **Moderate-to-Strong association**
-- **Economic Status**: V = **0.269** → **Moderate association**
-- **SpecialEdStatus**: V = **0.255** → **Moderate association**
-- **Gender**: V = **0.134** → **Weak-to-Moderate association**
-
-**Ranking (strongest to weakest):**
-
-1.  **RaceEthnicity** (0.299)
-2.  **Economic Status** (0.269)
-3.  **SpecialEdStatus** (0.255)
-4.  **Gender** (0.134)
-
-------------------------------------------------------------------------
-
-### Interpretation of Results
-
-- **RaceEthnicity**: Graduation odds differ substantially across groups. **White** and **Asian/PI** students show much higher postsecondary completion than **Black**, **Hispanic**, and especially **American Indian** students. Disparities are sizable, making race/ethnicity the strongest demographic predictor of PS graduation in this set.
-- **Economic Status**: **Non–low-income** students are far more likely to graduate than **low-income** peers, indicating persistent socioeconomic barriers through to completion (not just entry).
-- **SpecialEdStatus**: Students identified for **special education** graduate PS at much lower rates than non-SPED peers, reflecting compounding access and persistence challenges.
-- **Gender**: **Females** are more likely to graduate than **males**, but the effect is modest relative to race/ethnicity and income.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-Postsecondary graduation is most strongly patterned by **race/ethnicity**, followed by **economic status** and **special education status**; **gender** plays a smaller role. In practice, this suggests that strategies to improve PS completion should **prioritize equity-focused supports** (targeting racial/ethnic and income-related barriers) and **enhanced persistence services for SPED students**, with gender-focused interventions as a secondary consideration.
-
-*Note:* Per your instruction, any records or categories representing “Attending PS” were **not included** in calculations (none were present in the supplied files). All `ps.grad` values were standardized to **Yes/No** for consistency.
+Across the demographic group, the clearest finding is that economic disadvantage and special education status are the two strongest barriers to postsecondary credential completion in Southeast Minnesota, with gaps exceeding 29 and 36 percentage points respectively. The gender gap favoring females is consistent and meaningful. Racial and ethnic disparities are substantial, with Black, Hispanic, and American Indian graduates completing at roughly half the rate of White and Asian/PI graduates. These patterns will be important context for interpreting the postsecondary pathway distributions in the multivariate stages.
 
 ::: panel-tabset
 ### `Gender`
@@ -712,50 +300,39 @@ data <- master.original %>%
 tab_xtab(var.row = data$ps.grad,
          var.col = data$Gender,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad, Gender) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/Demographics/Gender.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/Demographics/gender.html")
 ```
 
-### economic.status
+### `economic.status`
 
 ```{r}
 tab_xtab(var.row = data$ps.grad,
          var.col = data$economic.status,
          show.exp = TRUE,
-         show.col.prc = TRUE)
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/Demographics/economic-status.html")
 
-data %>%
-  select(ps.grad, economic.status) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/Demographics/economic-status.csv")
 ```
 
-### RaceEthnicity
+### `RaceEthnicity`
 
 ```{r}
 tab_xtab(var.row = data$ps.grad,
          var.col = data$RaceEthnicity,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad, RaceEthnicity) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/Demographics/RaceEthnicity.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/Demographics/RaceEthnicity.html")
 ```
 
-### SpecialEdStatus
+### `SpecialEdStatus`
 
 ```{r}
 tab_xtab(var.row = data$ps.grad,
          var.col = data$SpecialEdStatus,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad, SpecialEdStatus) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/Demographics/SpecialEdStatus.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/Demographics/SpecialEdStatus.html")
 ```
 :::
 
@@ -765,48 +342,24 @@ data %>%
 
 Here are the variables we will be exploring;
 
-- `Dem_Desc`
+- `edr`
 - `avg.unemp.rate`
-- `avg.wage.pct.state`
 
-### Cramer’s V / ANOVA Results (ps.grad \~ HS Characteristics)
+**HIGH SCHOOL CHARACTERISTICS AND POSTSECONDARY GRADUATION**
 
-- **Dem_Desc**: V = **0.026** → **Very weak association**
-- **avg.unemp.rate**: F = **895.64**, p \< 0.001 → Significant difference (effect size small but meaningful given large N)
-- **avg.wages.pct.state**: F = **387.50**, p \< 0.001 → Significant difference (effect size small)
+EDR shows no meaningful association with postsecondary credential completion (φ=0.004, p=0.199). Completion rates are essentially identical across EDR 10 (46.2%) and EDR 9 (45.7%). Whether a graduate attended high school in the Southeast or South Central economic development region has no bearing on whether they complete a postsecondary credential. This is consistent with the Stage 3 finding that EDR differences in workforce outcomes emerge after credential completion through geographic sorting, not before it through differential completion rates.
 
-**Ranking (strongest to weakest):**
-
-1.  **avg.unemp.rate** (largest F-statistic, strongest link to graduation)
-2.  **avg.wages.pct.state** (statistically significant but weaker)
-3.  **Dem_Desc** (negligible association)
-
-------------------------------------------------------------------------
-
-### Interpretation of Results
-
-- **Dem_Desc**: Community type (urban, rural, or mixed) shows virtually no independent impact on whether students graduate PS. This suggests that geographic setting of high school is not a meaningful predictor of completion once students are in the system.
-- **avg.unemp.rate**: Students from counties with **lower unemployment rates** are significantly more likely to graduate PS, highlighting the connection between stronger local economies and persistence through college.
-- **avg.wages.pct.state**: Students from areas with **higher wages relative to the state average** are more likely to complete PS, but the effect is smaller than unemployment rates.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-High school context factors show **statistically significant but modest effects** on postsecondary graduation. Economic conditions (particularly local unemployment rates) matter more than community type, though their predictive power is still weaker than core demographic factors like race, income, and special education status. Overall, **local economic health shapes graduation odds modestly, while geographic school setting adds little explanatory value.**
+Average local unemployment rate shows a statistically significant and substantively meaningful association with credential completion (F=895.6, p=0.000). Postsecondary graduates come from communities with meaningfully higher average unemployment (difference=0.252) than non-completers. This is a notable finding: higher local unemployment is associated with greater likelihood of credential completion, suggesting that weak local labor markets increase the relative attractiveness of postsecondary investment — graduates from communities with fewer immediate employment opportunities are more likely to pursue and complete credentials rather than entering the labor market directly. This inverts the Stage 3 pattern, where higher unemployment was associated with out-of-region employment and labor force marginality among those who entered the workforce directly.
 
 ::: panel-tabset
 ### Dem_Desc
 
 ```{r}
 tab_xtab(var.row = data$ps.grad,
-         var.col = data$Dem_Desc,
+         var.col = data$edr,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad, Dem_Desc) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/High school characteristics/Dem-Desc.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/High school characteristics/edr.html")
 ```
 
 ### avg.unemp.rate
@@ -814,28 +367,22 @@ data %>%
 ```{r}
 summary <- aov(avg.unemp.rate ~ ps.grad, data = data)
 
-summary(summary)
+summary <- aov(avg.unemp.rate ~ ps.grad, data = data)
+
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad, avg.unemp.rate) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/High school characteristics/avg-unemp-rate.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
 
-```
-
-### avg.wage.pct.state
-
-```{r}
-summary <- aov(avg.wages.pct.state ~ ps.grad, data = data)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-data %>%
-  select(ps.grad, avg.wages.pct.state) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/High school characteristics/avg-wages-pct-state.csv")
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/High school characteristics/avg-unemp-rate.xlsx", overwrite = TRUE)
 ```
 :::
 
@@ -845,116 +392,94 @@ data %>%
 
 Here are the variables we will explore.
 
-- `ACTCompositeScore`
-- `pseo.participant`
-- `cte.achievement`
-- `total.cte.courses.taken`
-- `MCA.M`
-- `MCA.R`
-- `MCA.S`
+- High school accomplishments
+  - `took.ACT`
+  - `ACTCompositeScore`
+  - `MCA.M`
+  - `MCA.R`
+  - `MCA.S`
+  - `cte.achievement`
+  - `total.cte.courses.taken`
 
-### Cramer’s V / ANOVA Results (ps.grad \~ HS Accomplishments)
+**HIGH SCHOOL ACCOMPLISHMENT VARIABLES AND POSTSECONDARY GRADUATION**
 
-- **cte.achievement**: V = **0.124** → **Weak-to-Moderate association**
-- **ACTCompositeScore**: F = **9081.67**, p \< 0.001 → Significant difference (strong effect)
-- **MCA Math**: F = **8689.25**, p \< 0.001 → Significant difference (strong effect)
-- **MCA Reading**: F = **10459.23**, p \< 0.001 → Significant difference (very strong effect)
-- **MCA Science**: F = **7620.50**, p \< 0.001 → Significant difference (strong effect)
-- **total.cte.courses.taken**: F = **2264.67**, p \< 0.001 → Significant difference (modest effect)
+The high school accomplishment variables show the strongest and most consistent associations with postsecondary credential completion of any variable group, and the direction of associations reveals a clear academic orientation versus CTE engagement divide that mirrors the workforce outcome findings.
 
-**Ranking (strongest to weakest):**
+took.ACT is the strongest categorical predictor of credential completion (φ=0.383). ACT takers complete postsecondary credentials at 59.7% compared to just 19.4% for non-takers — a gap of 40.3 percentage points. This is the largest single gap of any accomplishment variable and confirms that ACT participation is functioning as a near-perfect proxy for postsecondary intent and follow-through in Southeast Minnesota.
 
-1.  **MCA Reading** (largest F-statistic, strongest predictor)
-2.  **ACTCompositeScore** (very strong predictor, nearly equal to MCA scores)
-3.  **MCA Math**
-4.  **MCA Science**
-5.  **total.cte.courses.taken** (significant but modest association)
-6.  **cte.achievement** (weak-to-moderate categorical effect)
+ap.exam shows a very strong association with credential completion (φ=0.299). AP exam takers complete postsecondary credentials at 74.9% compared to just 38.4% for non-takers — a gap of 36.5 percentage points. This is the second strongest categorical predictor of credential completion after took.ACT (φ=0.383), and the two variables are measuring closely related dimensions of academic orientation and postsecondary intent. Only 25.1% of AP exam takers fail to complete a credential, compared to 61.6% of non-takers. AP participation in high school is among the strongest available signals that a graduate will successfully navigate the postsecondary pathway to credential completion.
 
-------------------------------------------------------------------------
+ACT Composite Score shows the strongest F-statistic of any continuous variable (F=9081.7). Postsecondary graduates score 3.49 composite points above non-completers — a substantively large difference on a 36-point scale. Academic achievement as measured by the ACT is a powerful predictor of credential completion, operating independently of and likely additively with ACT participation itself.
 
-### Interpretation of Results
+MCA Math shows a strong association (F=8689.3) with graduates scoring 0.588 standard deviations above non-completers. MCA Reading is similarly strong (F=10459.2) with graduates scoring 0.570 above non-completers. The two measures are essentially equivalent in their association with credential completion and both confirm that academic achievement in high school is a robust predictor of postsecondary success.
 
-- **MCA Reading, Math, Science**: Strong academic performance is the clearest predictor of graduating PS, especially Reading, which shows the strongest link.
-- **ACTCompositeScore**: Higher ACT scores are also strongly predictive of graduation, aligning with MCA results.
-- **total.cte.courses.taken**: More CTE coursework correlates with higher PS graduation odds, though the effect is smaller than academics.
-- **cte.achievement**: Students classified as **CTE concentrators/completors** show somewhat better graduation outcomes than participants or non-CTE students, but the effect size is modest.
+cte.achievement shows a moderate but noteworthy association (V=0.124), and the direction is the inverse of all other accomplishment variables. No CTE graduates show the highest completion rate (54.3%), CTE participants are intermediate (47.4%), and CTE concentrators and completors show the lowest completion rate (39.5%). This monotonic negative gradient confirms that CTE engagement and postsecondary credential completion are in tension — the workforce-first pathway and the college completer pathway are selecting different students, and those most committed to CTE are least likely to complete postsecondary credentials.
 
-------------------------------------------------------------------------
+Total CTE courses taken reinforces this finding (F=2264.7). Postsecondary graduates take on average 1.005 fewer CTE courses than non-graduates — approximately one full course less. The direction is unambiguous and consistent with cte.achievement: greater CTE investment in high school is associated with lower likelihood of postsecondary credential completion.
 
-### Conclusion
-
-**Academic rigor measures (MCA and ACT scores) are by far the strongest predictors of postsecondary graduation**, with MCA Reading leading the way. **CTE engagement**, whether measured by courses taken or concentrator status, shows positive but smaller associations.
-
-In short: **students with higher academic achievement and stronger engagement in CTE are more likely to graduate PS**, but academics remain the dominant driver of completion.
+Taken together, the accomplishment group findings clarify the mechanism underlying the three-pathway structure. Academic achievement variables — took.ACT, ap.exam, ACT score, MCA Reading, MCA Math — are positively and strongly associated with credential completion, while CTE engagement variables are negatively associated with it. These are not simply weak students versus strong students — they represent genuinely different orientations toward post-high school life that are already visible in high school course-taking and testing behavior.
 
 ::: panel-tabset
-### ACTCompositeScore
+### `took.ACT`
+
+```{r}
+tab_xtab(var.row = data$ps.grad,
+         var.col = data$took.ACT,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/High school accomplishments/took-ACT.html")
+```
+
+### `ACTCompositeScore`
 
 ```{r}
 summary <- aov(ACTCompositeScore ~ ps.grad, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad, ACTCompositeScore) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/High school accomplishments/ACTCompositeScore.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/High school accomplishments/ACTCompositeScore.xlsx", overwrite = TRUE)
 ```
 
-### pseo.participant
+### `ap.exam`
 
 ```{r}
 tab_xtab(var.row = data$ps.grad,
-         var.col = data$pseo.participant,
+         var.col = data$ap.exam,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad, pseo.participant) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/High school accomplishments/avg-wages-pct-state.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/High school accomplishments/ap-exam.html")
 ```
 
-### cte.achievement
-
-```{r}
-tab_xtab(var.row = data$ps.grad,
-         var.col = data$cte.achievement,
-         show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad, cte.achievement) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/High school accomplishments/cte-achievement.csv")
-```
-
-### total.cte.courses.taken
-
-```{r}
-summary <- aov(total.cte.courses.taken ~ ps.grad, data = data)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-data %>%
-  select(ps.grad, total.cte.courses.taken) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/High school accomplishments/total-cte-courses-taken.csv")
-```
-
-### MCA.M
+### `MCA.M`
 
 ```{r}
 summary <- aov(MCA.M ~ ps.grad, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad, MCA.M) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/High school accomplishments/MCA-M.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/High school accomplishments/MCA-M.xlsx", overwrite = TRUE)
 ```
 
 ### MCA.R
@@ -962,13 +487,20 @@ data %>%
 ```{r}
 summary <- aov(MCA.R ~ ps.grad, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad, MCA.R) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/High school accomplishments/MCA-R.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/High school accomplishments/MCA-R.xlsx", overwrite = TRUE)
 
 ```
 
@@ -977,69 +509,57 @@ data %>%
 ```{r}
 summary <- aov(MCA.S ~ ps.grad, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad, MCA.S) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad/High school accomplishments/MCA-S.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/High school accomplishments/MCA-S.xlsx", overwrite = TRUE)
+```
+
+### cte.achievement
+
+```{r}
+tab_xtab(var.row = data$ps.grad,
+         var.col = data$cte.achievement,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/High school accomplishments/cte-achievement.html")
+```
+
+### total.cte.courses.taken
+
+```{r}
+summary <- aov(total.cte.courses.taken ~ ps.grad, data = data)
+
+summary
+
+anova_df <- broom::tidy(summary)
+
+TukeyHSD(summary)
+
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad/High school accomplishments/total-cte-courses-taken.xlsx", overwrite = TRUE)
 ```
 :::
 
-# ps.grad.InstitutionSector
+<br>
 
-## Total Summary: Predictors of Postsecondary Graduation by Institution Sector (ps.grad.InstitutionSector)
-
-Graduates sort into **public 4-year colleges, public 2-year colleges, or other types of institutions** along clear demographic and academic lines. The strongest pattern is that **academic rigor and early college exposure (PSEO) channel students into 4-year pathways**, while **CTE engagement and demographic disadvantage channel students into 2-year pathways**. Since prior findings show that **2-year credentials are more strongly tied to meaningful regional employment**, this sorting mechanism has direct implications for regional workforce retention.
-
-------------------------------------------------------------------------
-
-### **1. Strong Predictors of Institution Sector**
-
-These variables show **moderate associations or strong academic effects** and consistently distinguish graduates of 2-year versus 4-year institutions.
-
-| Variable | Type | Key Insights |
-|----|----|----|
-| SpecialEdStatus | Demographic | SPED students disproportionately graduate from 2-year colleges, rarely from 4-year institutions. |
-| Economic Status | Demographic | Low-income students more likely to graduate from 2-year colleges; non–low-income students dominate 4-year completions. |
-| ACTCompositeScore | Accomplishment (continuous) | Higher ACT scores strongly linked to 4-year graduation; lower scores linked to 2-year institutions. |
-| MCA Reading, Math, Science | Accomplishment (continuous) | Higher MCA scores drive 4-year outcomes; lower scores concentrate in 2-year institutions. |
-| PSEO Participation | Accomplishment (categorical) | Students who participated in PSEO disproportionately graduate from 4-year colleges, reinforcing early exposure to rigorous pathways. |
-
-------------------------------------------------------------------------
-
-### **2. Moderate Predictors — Secondary but Meaningful**
-
-These variables show **moderate associations**, adding nuance to institutional sorting.
-
-| Variable | Type | Key Insights |
-|----|----|----|
-| RaceEthnicity | Demographic | White and Asian/PI students are more likely to complete at 4-year institutions, while Black, Hispanic, and American Indian students are more concentrated in 2-year outcomes. |
-| Gender | Demographic | Females somewhat more likely to graduate from 4-year institutions; males more represented in 2-year outcomes. |
-| total.cte.courses.taken | Accomplishment (continuous) | More CTE courses increase the likelihood of 2-year completions. |
-| cte.achievement | Accomplishment (categorical) | CTE concentrators/completors disproportionately complete at 2-year institutions. |
-| avg.unemp.rate | HS Characteristic (continuous) | Students from higher unemployment counties lean toward 2-year outcomes. |
-| avg.wages.pct.state | HS Characteristic (continuous) | Lower-wage areas are associated with more 2-year completions. |
-
-------------------------------------------------------------------------
-
-### **3. Weak Predictors — Limited Independent Effect**
-
-| Variable | Type | Notes |
-|----|----|----|
-| Dem_Desc | HS Characteristic | Community type (urban/rural/mixed) shows only weak effects once demographics and academics are accounted for. |
-
-------------------------------------------------------------------------
-
-### **Conclusion**
-
-Institutional sorting reflects a dual system:
-
-- **High academic achievers and PSEO participants are channeled into 4-year institutions**, a pathway associated with statewide mobility and weaker regional retention.
-- **Students facing economic disadvantage, SPED identification, or strong CTE engagement are more likely to graduate from 2-year colleges**, a pathway tied to higher odds of meaningful employment within the region.
-
-In short: **Institution sector is not only a reflection of student preparation and background, but also a mechanism that shapes regional workforce outcomes.** By understanding these predictors, policymakers can strengthen **2-year college pathways as engines of regional employment**, while ensuring disadvantaged groups are supported in persisting and completing their chosen pathways.
+# `ps.grad.InstitutionSector` - college completers only
 
 ## Demographics
 
@@ -1050,36 +570,19 @@ Here are the variables we will be exploring;
 - `RaceEthnicity`
 - `SpecialEdStatus`
 
-### Cramer’s V Scores and Strength (ps.grad.InstitutionSector \~ Demographics)
+**DEMOGRAPHIC VARIABLES AND POSTSECONDARY INSTITUTION SECTOR (Among credential completers only, n=47,959)**
 
-- **SpecialEdStatus**: V = **0.182** → **Moderate association**
-- **Economic Status**: V = **0.168** → **Moderate association**
-- **RaceEthnicity**: V = **0.155** → **Weak-to-Moderate association**
-- **Gender**: V = **0.124** → **Weak-to-Moderate association**
+Among the 47,959 graduates who completed a postsecondary credential, the distribution across institution sectors is: public 4-year (44.5%), public 2-year (25.7%), private not-for-profit 4-year (18.3%), multiple sectors (9.3%), and other (2.2%).
 
-**Ranking (strongest to weakest):**
+Gender shows a moderate association with institution sector (V=0.134). The most striking difference is in public 2-year completion — males complete at public 2-year institutions at 30.8% compared to 21.6% for females, a gap of 9.2 percentage points. Females show higher rates of multiple sector completion (11.0% vs. 7.2%) and other institution completion (3.1% vs. 1.1%). Public 4-year completion is essentially identical across genders (44.5% for both), and private not-for-profit 4-year completion slightly favors females (19.9% vs. 16.3%). The gender divide between public 2-year and private not-for-profit 4-year is the clearest signal — males disproportionately complete sub-baccalaureate credentials at community and technical colleges, while females show greater representation at private 4-year institutions.
 
-1.  **SpecialEdStatus** (0.182)
-2.  **Economic Status** (0.168)
-3.  **RaceEthnicity** (0.155)
-4.  **Gender** (0.124)
+Economic status shows a strong association (V=0.182). Low-income graduates complete at public 2-year institutions at 41.1% compared to just 22.3% for non-low-income graduates — a gap of nearly 19 percentage points. Non-low-income graduates dominate public 4-year completion (47.2% vs. 32.2%) and private not-for-profit 4-year completion (19.4% vs. 13.1%). The economic status gradient in institution sector is monotonic and consistent: as economic disadvantage increases, credential completion shifts from 4-year toward 2-year institutions. This directly anticipates the workforce outcome implications — low-income completers are more likely to hold sub-baccalaureate credentials associated with regional employment, while non-low-income completers are more likely to hold 4-year credentials associated with out-of-region careers.
 
-------------------------------------------------------------------------
+Special education status shows a similarly strong association (V=0.184). Special education graduates who complete credentials do so overwhelmingly at public 2-year institutions (62.9% vs. 24.0% for non-special education graduates), and at substantially lower rates at public 4-year (17.6% vs. 45.7%) and private not-for-profit 4-year (9.1% vs. 18.7%) institutions. The pattern mirrors economic status but is even more pronounced — among those who complete credentials, special education graduates are concentrated almost exclusively in public 2-year institutions.
 
-### Interpretation of Results
+Race and ethnicity shows a moderate association (V=0.111) with substantively important within-group variation. The Unknown category again shows an anomalous pattern — 90.0% public 2-year completion — which reinforces the interpretation that this category captures a specific non-traditional student population rather than simply missing data. Among identified groups, Hispanic graduates show the highest public 2-year completion rate (44.6%), followed by Black graduates (33.7%) and American Indian graduates (33.3%), all substantially above White graduates (23.9%). Asian/PI graduates show the highest private not-for-profit 4-year completion rate (23.0%) and the highest public 4-year rate (47.6%). White graduates show the highest public 4-year rate among larger groups (45.9%). These patterns are consistent with economic access constraints directing minority graduates toward more accessible 2-year institutions, though the Asian/PI pattern suggests a distinctly different credential pathway.
 
-- **SpecialEdStatus**: Students in special education are disproportionately represented in **public 2-year colleges**, with much smaller shares in 4-year institutions. Non-SPED students are more likely to graduate from 4-year institutions.
-- **Economic Status**: **Low-income students** are more likely to graduate from **public 2-year colleges** and less likely from 4-year institutions compared to their non–low-income peers.
-- **RaceEthnicity**: Disparities are evident. **White and Asian/PI students** are more likely to graduate from 4-year institutions, while **Black, Hispanic, and American Indian students** show greater representation in 2-year institutions.
-- **Gender**: **Females** are more likely to graduate from 4-year institutions than males, while males are slightly more represented in 2-year pathways.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-The type of postsecondary institution students graduate from is most strongly associated with **special education status and economic status**, followed by race/ethnicity and gender. Disadvantaged groups (SPED, low-income, and historically marginalized racial/ethnic groups) are more likely to complete at **2-year colleges**, while more advantaged peers and females are more likely to graduate from **4-year institutions**.
-
-In short: **institutional sector of graduation reflects both opportunity and constraint** — disadvantaged students often cluster into public 2-year colleges, while advantaged students disproportionately graduate from 4-year institutions.
+Across the demographic group, the dominant finding is that economic disadvantage, special education status, male gender, and minority racial and ethnic status are all associated with public 2-year completion at the expense of 4-year completion. Given the strong workforce outcome associations shown in Stage 3 — where public 2-year completion predicted regional employment and 4-year completion predicted out-of-region careers — these demographic patterns have direct implications for understanding which graduates end up in which workforce pathway.
 
 ::: panel-tabset
 ### `Gender`
@@ -1089,13 +592,10 @@ data <- master.original %>%
   filter(!ps.grad.InstitutionSector %in% c("Attending ps", "Did not grad", "Never attended ps"))
 
 tab_xtab(var.row = data$ps.grad.InstitutionSector,
-         var.col = data$economic.status,
+         var.col = data$Gender,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.InstitutionSector, Gender) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/Demographics/Gender.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/Demographics/Gender.html")
 ```
 
 ### `economic.status`
@@ -1104,11 +604,8 @@ data %>%
 tab_xtab(var.row = data$ps.grad.InstitutionSector,
          var.col = data$economic.status,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.InstitutionSector, economic.status) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/Demographics/economic-status.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/Demographics/economic-status.html")
 ```
 
 ### `RaceEthnicity`
@@ -1118,11 +615,8 @@ data %>%
 tab_xtab(var.row = data$ps.grad.InstitutionSector,
          var.col = data$RaceEthnicity,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.InstitutionSector, RaceEthnicity) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/Demographics/RaceEThnicity.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/Demographics/RaceEthnicity.html")
 ```
 
 ### `SpecialEdStatus`
@@ -1131,11 +625,8 @@ data %>%
 tab_xtab(var.row = data$ps.grad.InstitutionSector,
          var.col = data$SpecialEdStatus,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.InstitutionSector, SpecialEdStatus) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/Demographics/SpecialEdStatus.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/Demographics/SpecialEdStatus.html")
 ```
 :::
 
@@ -1147,46 +638,22 @@ Here are the variables we will be exploring;
 
 - `Dem_Desc`
 - `avg.unemp.rate`
-- `avg.wage.pct.state`
 
-### Cramer’s V / ANOVA Results (ps.grad.InstitutionSector \~ HS Characteristics)
+**HIGH SCHOOL CHARACTERISTICS AND POSTSECONDARY INSTITUTION SECTOR (Among credential completers only, n=47,959)**
 
-- **Dem_Desc**: V = **0.060** → **Weak association**
-- **avg.unemp.rate**: F = **61.40**, p \< 0.001 → Significant differences across institution types (effect small)
-- **avg.wages.pct.state**: F = **45.93**, p \< 0.001 → Significant differences across institution types (effect small)
+EDR shows a weak but statistically significant association with institution sector (V=0.077). The most notable differences are in multiple sector completion (10.0% for EDR 10 vs. 7.5% for EDR 9) and the other institution category (1.6% for EDR 10 vs. 3.7% for EDR 9). Public 2-year completion is identical across EDRs (25.7% both), and public 4-year completion is very similar (44.0% vs. 45.7%). The overall picture is that where a graduate attended high school within Southeast Minnesota has essentially no bearing on what type of institution they complete a credential from — the sector distribution is near-equivalent across EDR 9 and EDR 10.
 
-**Ranking (strongest to weakest):**
-
-1.  **avg.unemp.rate** (largest F-statistic, strongest link to institution type)
-2.  **avg.wages.pct.state** (significant but slightly weaker)
-3.  **Dem_Desc** (weak categorical effect)
-
-------------------------------------------------------------------------
-
-### Interpretation of Results
-
-- **Dem_Desc**: Students from different community types (urban, rural, mixed) show only minor variation in where they graduate. Urban students are slightly more likely to complete at 4-year institutions, while rural/town students lean somewhat more toward 2-year completions. Overall, the effect is weak.
-- **avg.unemp.rate**: Students from counties with **lower unemployment rates** are more likely to graduate from 4-year institutions, while higher unemployment counties show relatively more 2-year completions.
-- **avg.wages.pct.state**: Higher relative local wages are linked to a greater likelihood of 4-year completions, while students from lower-wage areas are modestly more concentrated in 2-year institutions.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-High school contextual factors show **statistically significant but modest effects** on the type of postsecondary institution where students graduate. **Local economic conditions (unemployment and wages) matter more than rural/urban school setting**, nudging students toward either 2-year or 4-year completions. However, compared to demographic and accomplishment factors, these remain **secondary predictors** of institutional sector outcomes.
+Average local unemployment rate shows a statistically significant but modest association with institution sector (F=45.1). The Tukey HSD comparisons reveal a clear ordering: graduates from the other institution category come from the highest unemployment communities, followed by multiple sector (10), then private not-for-profit 4-year (2), then public 2-year and public 4-year — which are not significantly different from each other (difference=-0.010, p=0.963). The other and multiple sector categories represent less conventional credential paths and their association with higher local unemployment is consistent with graduates from weaker labor markets pursuing less traditional postsecondary routes. The absence of a meaningful difference between public 2-year and public 4-year completers in local unemployment rates is notable — it suggests that the choice between 2-year and 4-year public institutions is not primarily driven by local labor market conditions but rather by other factors, likely academic preparation and economic resources as seen in the demographic findings above.
 
 ::: panel-tabset
-### `Dem_Desc`
+### `edr`
 
 ```{r}
 tab_xtab(var.row = data$ps.grad.InstitutionSector,
-         var.col = data$Dem_Desc,
+         var.col = data$edr,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.InstitutionSector, Dem_Desc) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/High school characteristics/Dem-Desc.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/High school characteristics/edr.csv")
 ```
 
 ### `avg.unemp.rate`
@@ -1194,27 +661,20 @@ data %>%
 ```{r}
 summary <- aov(avg.unemp.rate ~ ps.grad.InstitutionSector, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.InstitutionSector, avg.unemp.rate) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/High school characteristics/avg-unemp-rate.csv")
-```
+tukey_df <- broom::tidy(TukeyHSD(summary))
 
-### `avg.wage.pct.state`
-
-```{r}
-summary <- aov(avg.wages.pct.state ~ ps.grad.InstitutionSector, data = data)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-data %>%
-  select(ps.grad.InstitutionSector, avg.wages.pct.state) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/High school characteristics/avg-wages-pct-state.csv")
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/High school characteristics/avg-unemp-rate.xlsx", overwrite = TRUE)
 ```
 :::
 
@@ -1224,13 +684,9 @@ data %>%
 
 Here are the variables we will explore.
 
+- `took.ACT`
+
 - `ACTCompositeScore`
-
-- `pseo.participant`
-
-- `cte.achievement`
-
-- `total.cte.courses.taken`
 
 - `MCA.M`
 
@@ -1238,73 +694,69 @@ Here are the variables we will explore.
 
 - `MCA.S`
 
-### Cramer’s V / ANOVA Results (ps.grad.InstitutionSector \~ HS Accomplishments)
+- `cte.achievement`
 
-- **cte.achievement**: V = **0.162** → **Moderate association**
-- **pseo.participant**: V = **0.169** → **Moderate association**
-- **ACTCompositeScore**: F = **3576.35**, p \< 0.001 → Significant difference (strong effect)
-- **MCA Math**: F = **2061.31**, p \< 0.001 → Significant difference (moderate-to-strong effect)
-- **MCA Reading**: F = **2658.03**, p \< 0.001 → Significant difference (strong effect)
-- **MCA Science**: F = **1963.57**, p \< 0.001 → Significant difference (moderate-to-strong effect)
-- **total.cte.courses.taken**: F = **2264.49**, p \< 0.001 → Significant difference (moderate effect)
+- `total.cte.courses.taken`
 
-**Ranking (strongest to weakest):**
+**HIGH SCHOOL ACCOMPLISHMENT VARIABLES AND POSTSECONDARY INSTITUTION SECTOR (Among credential completers only, n=47,959)**
 
-1.  **ACTCompositeScore** (largest F-statistic, strongest continuous predictor)
-2.  **MCA Reading** (strong association, next highest F-statistic)
-3.  **total.cte.courses.taken** (stronger than Math/Science in this case)
-4.  **MCA Math**
-5.  **MCA Science**
-6.  **pseo.participant** (moderate categorical effect)
-7.  **cte.achievement** (moderate categorical effect)
+The high school accomplishment variables reveal a sharp and consistent academic achievement gradient across institution sectors, with CTE engagement showing the opposite pattern.
 
-------------------------------------------------------------------------
+took.ACT is the strongest categorical predictor of institution sector (V=0.357). Non-ACT takers complete at public 2-year institutions at a dramatically higher rate (62.1%) than ACT takers (19.7%), while ACT takers dominate public 4-year (49.0% vs. 17.1%) and private not-for-profit 4-year (20.1% vs. 7.6%) completion. The other institution category is notable — 4.6% of non-ACT takers versus 1.8% of ACT takers — consistent with non-traditional credential paths being more common among those who never pursued academic preparation for four-year institutions.
 
-### Interpretation of Results
+ap.exam shows the strongest association with institution sector of any categorical accomplishment variable (V=0.330). AP exam takers complete at private not-for-profit 4-year institutions at 28.3% compared to just 13.1% for non-takers — more than double — and at public 4-year institutions at 54.8% versus 39.1%. By contrast, non-takers complete at public 2-year institutions at 34.9% compared to just 8.0% for AP exam takers — a gap of nearly 27 percentage points. AP participation is the strongest single predictor of 4-year over 2-year credential completion among all categorical variables examined, and the private not-for-profit 4-year advantage is particularly pronounced. The other institution category shows a higher non-AP-taker rate (2.9% vs. 1.0%), consistent with non-traditional credential paths being concentrated among those who did not pursue advanced academic coursework in high school.
 
-- **Academic Rigor (ACT & MCA scores)**: Students with higher ACT and MCA scores are much more likely to graduate from **4-year institutions**, while those with lower scores cluster more in **2-year colleges**.
-- **total.cte.courses.taken**: More CTE coursework correlates with a greater likelihood of completing at a **2-year institution** versus 4-year, suggesting CTE steers students toward applied, shorter-term pathways.
-- **cte.achievement**: CTE concentrators/completors are more strongly represented in **2-year institutions**, while non-CTE peers are more likely at 4-year institutions.
-- **pseo.participant**: Students who took part in PSEO are overrepresented in **4-year completions**, suggesting early college exposure aligns with baccalaureate pathways.
+ACT Composite Score shows the largest mean differences of any continuous variable (F=2391.4). The ordering is clear: private not-for-profit 4-year graduates score highest, followed by public 4-year, then multiple sectors, then public 2-year, then other. Public 4-year graduates score 4.38 composite points above public 2-year graduates — a substantively large difference — and private not-for-profit 4-year graduates score an additional 1.49 points above public 4-year graduates. The other category scores lowest by a considerable margin, 2.40 points below multiple sectors and 5.32 points below private not-for-profit 4-year.
 
-------------------------------------------------------------------------
+MCA Math (F=1325.3), MCA Reading (F=1550.4), and MCA Science (F=1298.4) all show the same sector ordering and the pattern is highly consistent across measures. In all three assessments: private not-for-profit 4-year graduates score highest, public 4-year second, multiple sectors third, public 2-year fourth, and other lowest. The public 4-year versus public 2-year gaps are approximately 0.62 (Math), 0.53 (Reading), and 0.57 (Science) standard deviations — meaningful differences that confirm the academic achievement gradient operates similarly across all three assessments.
 
-### Conclusion
+cte.achievement shows a strong association (V=0.177) in the opposite direction from academic achievement. CTE concentrators and completors complete at public 2-year institutions at 37.3% — more than double the rate for No CTE graduates (14.4%) — while No CTE graduates dominate private not-for-profit 4-year completion (26.7% vs. 11.8% for concentrators). Public 4-year completion is relatively similar across CTE categories (39.9%, 46.3%, 47.7%), with No CTE graduates slightly more represented. The CTE concentrator advantage in public 2-year completion is the clearest expression of the workforce-first pathway structure within the credential completion population — those most committed to CTE earn sub-baccalaureate credentials at community and technical colleges.
 
-The type of institution where students graduate reflects a balance of **academic rigor, CTE engagement, and early PS exposure**.
+Total CTE courses taken (F=1290.2) confirms this with a clear dose-response relationship. Public 2-year graduates take the most CTE courses on average, followed by other, multiple sectors, public 4-year, and private not-for-profit 4-year. Public 2-year graduates take approximately 1.92 more CTE courses than public 4-year graduates and 2.80 more than private not-for-profit 4-year graduates — the largest continuous variable gaps in this analysis.
 
-- **Higher academic scores (ACT, MCA)** push students toward **4-year institutions**.
-- **CTE pathways (courses, concentrator status)** push students toward **2-year institutions**.
-- **PSEO participation** nudges students toward **4-year completions**.
-
-In short: **rigor and PSEO align with 4-year outcomes, while CTE aligns with 2-year outcomes**, highlighting a clear sorting mechanism between academic and applied postsecondary pathways.
+The accomplishment variable findings for institution sector are among the most analytically important in this postsecondary stage. Academic achievement sorts graduates decisively toward 4-year institutions, while CTE engagement sorts them toward 2-year institutions — and these two sorting mechanisms operate in opposite directions within the credential completer population. Combined with the workforce outcome findings from Stage 3, this establishes a clear chain: high CTE engagement → public 2-year completion → regional employment, and high academic achievement → private or public 4-year completion → out-of-region employment.
 
 ::: panel-tabset
-### ACTCompositeScore
+### `took.ACT`
+
+```{r}
+tab_xtab(var.row = data$ps.grad.InstitutionSector,
+         var.col = data$took.ACT,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/High school accomplishments/took-ACT.html")
+
+```
+
+### `ACTCompositeScore`
 
 ```{r}
 summary <- aov(ACTCompositeScore ~ ps.grad.InstitutionSector, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.InstitutionSector, ACTCompositeScore) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/High school accomplishments/ACTCompositeScore.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/High school accomplishments/ACTCompositeScore.xlsx", overwrite = TRUE)
 ```
 
-### pseo.participant
+### `ap.exam`
 
 ```{r}
 tab_xtab(var.row = data$ps.grad.InstitutionSector,
-         var.col = data$pseo.participant,
+         var.col = data$ap.exam,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.InstitutionSector, pseo.participant) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/High school accomplishments/pseo-participant.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/High school accomplishments/ap-exam.html")
 ```
 
 ### cte.achievement
@@ -1313,11 +765,9 @@ data %>%
 tab_xtab(var.row = data$ps.grad.InstitutionSector,
          var.col = data$cte.achievement,
          show.exp = TRUE,
-         show.col.prc = TRUE)
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/High school accomplishments/cte-achievement.html")
 
-data %>%
-  select(ps.grad.InstitutionSector, cte.achievement) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/High school accomplishments/cte-achievement.csv")
 ```
 
 ### total.cte.courses.taken
@@ -1325,13 +775,20 @@ data %>%
 ```{r}
 summary <- aov(total.cte.courses.taken ~ ps.grad.InstitutionSector, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.InstitutionSector, total.cte.courses.taken) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/High school accomplishments/total-cte-courses-taken.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/High school accomplishments/total-cte-courses-taken.xlsx", overwrite = TRUE)
 ```
 
 ### MCA.M
@@ -1339,13 +796,20 @@ data %>%
 ```{r}
 summary <- aov(MCA.M ~ ps.grad.InstitutionSector, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.InstitutionSector, MCA.M) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/High school accomplishments/mca-m.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/High school accomplishments/MCA-M.xlsx", overwrite = TRUE)
 ```
 
 ### MCA.R
@@ -1353,13 +817,20 @@ data %>%
 ```{r}
 summary <- aov(MCA.R ~ ps.grad.InstitutionSector, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.InstitutionSector, MCA.R) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/High school accomplishments/mca-r.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/High school accomplishments/MCA-R.xlsx", overwrite = TRUE)
 
 ```
 
@@ -1368,72 +839,26 @@ data %>%
 ```{r}
 summary <- aov(MCA.S ~ ps.grad.InstitutionSector, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.InstitutionSector, MCA.S) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad institution sector/High school accomplishments/MCA-S.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-InstitutionSector/High school accomplishments/MCA-S.xlsx", overwrite = TRUE)
 ```
 :::
 
 <br>
 
-# ps.grad.location
-
-## Total Summary: Predictors of Postsecondary Graduation by Location (ps.grad.location)
-
-Graduates sort into three categories: **Southern MN completions, Minnesota outside the region, and out-of-state completions**. The clearest pattern is that **demographic disadvantage and CTE engagement anchor students regionally**, while **academic rigor and PSEO participation propel students toward mobility**. This sorting mechanism directly ties to workforce outcomes: **regional completions are most strongly linked to meaningful employment in Southern MN**, while out-of-region completions align with statewide mobility.
-
-------------------------------------------------------------------------
-
-### **1. Strong Predictors of Graduation Location**
-
-These variables show the strongest and most consistent differentiation between regional and out-of-region completions.
-
-| Variable | Type | Key Insights |
-|----|----|----|
-| Economic Status | Demographic | Low-income students disproportionately graduate in **Southern MN**; non–low-income peers dominate out-of-region completions. |
-| ACTCompositeScore | Accomplishment (continuous) | Higher scores drive **out-of-region completions**; lower scores align with regional completions. |
-| MCA Reading, Math, Science | Accomplishment (continuous) | Higher MCA scores align with **out-of-region completions**; lower scores with **regional completions**. |
-| CTE Achievement & Courses Taken | Accomplishment | CTE concentrators and students with more CTE courses are disproportionately represented in **Southern MN completions**, anchoring them locally. |
-
-------------------------------------------------------------------------
-
-### **2. Moderate Predictors — Secondary but Meaningful**
-
-These variables show modest but still meaningful associations.
-
-| Variable | Type | Key Insights |
-|----|----|----|
-| RaceEthnicity | Demographic | White and Asian/PI graduates more likely to complete outside the region; Black, Hispanic, and American Indian students more concentrated in **regional completions**. |
-| SpecialEdStatus | Demographic | SPED students are more likely to complete in **Southern MN**, with fewer out-of-region completions. |
-| PSEO Participation | Accomplishment | PSEO students lean toward **out-of-region completions**, reinforcing the program’s tie to 4-year pathways. |
-| avg.wages.pct.state | HS Characteristic (continuous) | Graduates from lower-wage counties are more anchored to **Southern MN completions**; higher-wage counties produce more out-of-region completers. |
-| avg.unemp.rate | HS Characteristic (continuous) | Higher unemployment areas modestly increase the likelihood of **regional completions**. |
-
-------------------------------------------------------------------------
-
-### **3. Weak Predictors — Limited Independent Effect**
-
-| Variable | Type | Notes |
-|----|----|----|
-| Gender | Demographic | Male and female students show negligible differences in graduation location. |
-| Dem_Desc | HS Characteristic | Urban/rural/mixed school context adds little explanatory power once other factors are considered. |
-
-------------------------------------------------------------------------
-
-### **Conclusion**
-
-Graduation location reflects a dual system:
-
-- **Academic rigor (high ACT/MCA scores, PSEO) sorts students into out-of-region completions**, fueling statewide mobility.
-- **CTE engagement, low-income status, SPED identification, and disadvantaged local economies anchor students into Southern MN completions**, tying them to the regional workforce.
-
-In short: **regional completions are the strongest predictor of regional workforce retention**, and these are most common among students facing economic or educational disadvantage and those engaged in CTE. Strengthening supports for these students can help ensure their regional degrees translate into long-term, meaningful employment in Southern Minnesota.
-
-<br>
+# `ps.grad.location` - college completers only
 
 ## Demographics
 
@@ -1444,36 +869,19 @@ Here are the variables we will be exploring;
 - `RaceEthnicity`
 - `SpecialEdStatus`
 
-### Cramer’s V Scores and Strength (ps.grad.location \~ Demographics)
+**DEMOGRAPHIC VARIABLES AND POSTSECONDARY GRADUATION LOCATION (Among credential completers only, n=47,959)**
 
-- **Economic Status**: V = **0.126** → **Weak-to-Moderate association**
-- **RaceEthnicity**: V = **0.066** → **Weak association**
-- **SpecialEdStatus**: V = **0.059** → **Weak association**
-- **Gender**: V = **0.011** → **Negligible association**
+Among credential completers, 40.5% graduated from a regional institution, 30.3% from outside Minnesota, and 29.1% from elsewhere in Minnesota.
 
-**Ranking (strongest to weakest):**
+Gender shows no meaningful association with graduation location (V=0.011, p=0.065). The distribution across regional, MN, and outside MN graduation is essentially identical for females (41.0%, 28.9%, 30.1%) and males (39.9%, 29.5%, 30.6%). Where a graduate completes their credential is not associated with gender — this contrasts with the institution sector findings where gender showed a meaningful association with 2-year versus 4-year completion. The implication is that gender differences in institution type do not translate into meaningful geographic differences in where credentials are earned.
 
-1.  **Economic Status** (0.126)
-2.  **RaceEthnicity** (0.066)
-3.  **SpecialEdStatus** (0.059)
-4.  **Gender** (0.011)
+Economic status shows a moderate association with graduation location (V=0.126). Low-income graduates complete regional credentials at a substantially higher rate (52.6% vs. 37.9% for non-low-income graduates) and are considerably less likely to complete outside Minnesota (19.8% vs. 32.6%). MN graduation rates are modestly lower for low-income graduates (27.5% vs. 29.5%). The economic gradient in graduation location is clear and consistent with what the institution sector findings would predict — low-income graduates who complete credentials are more likely to do so at nearby regional institutions, while non-low-income graduates have greater access to out-of-state institutions. This has direct workforce outcome implications given the strong association between regional graduation and regional employment shown in Stage 3.
 
-------------------------------------------------------------------------
+Special education status shows a weak but significant association (V=0.059). Special education completers graduate from regional institutions at a higher rate (54.0% vs. 39.9%) and from outside Minnesota at a substantially lower rate (21.5% vs. 30.7%). MN graduation is modestly lower for special education completers (24.5% vs. 29.4%). The pattern mirrors economic status — among those who complete credentials, special education graduates are more geographically concentrated in regional institutions, likely reflecting both access constraints and the higher representation of special education graduates in public 2-year institutions shown in the institution sector analysis.
 
-### Interpretation of Results
+Race and ethnicity shows a moderate association (V=0.066) with substantively important variation. Hispanic (57.8%) and Unknown (58.5%) graduates show the highest regional completion rates, followed by Black (52.2%) and American Indian (32.1%) graduates, all above White graduates (39.5%). Outside MN graduation is highest among White (31.2%) and Asian/PI (29.9%) graduates, with substantially lower rates for Black (20.1%), Hispanic (19.5%), and Unknown (16.0%) graduates. MN graduation is highest among American Indian (43.2%) and Asian/PI (33.7%) graduates. The racial and ethnic variation in graduation location is consistent with the economic access constraints identified above — minority graduates who complete credentials are more likely to do so at nearby regional or in-state institutions, while White and Asian/PI graduates show greater geographic mobility in credential attainment.
 
-- **Economic Status**: Low-income graduates are more concentrated in **Southern MN completions**, while non–low-income students are more represented in **Minnesota outside the region** and especially **out-of-state completions**. This highlights income as the key factor anchoring students to the regional workforce.
-- **RaceEthnicity**: White and Asian/PI students are somewhat more likely to graduate outside the region (both MN and out-of-state). Black, Hispanic, and American Indian students are more concentrated in **regional completions**, suggesting stronger local ties despite overall smaller representation in PS completion.
-- **SpecialEdStatus**: SPED students are more likely to graduate in **Southern MN**, with far fewer completions outside the region, reflecting constrained mobility.
-- **Gender**: Male and female students show nearly identical distributions across institution locations, with negligible differences.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-**Economic status is the clearest demographic predictor of where students graduate**, with low-income students more anchored to **regional completions** and advantaged peers more mobile, graduating outside the region or state. Race/ethnicity and SPED status show weaker effects but similarly indicate that disadvantaged groups are more likely to stay regional. **Gender plays no meaningful role**.
-
-In short: **demographic disadvantage corresponds to stronger regional attachment through local completions**, while more advantaged groups are more mobile, graduating outside the region. This reinforces prior findings that **regional retention and workforce stability are most tied to pathways serving low-income and special education students**.
+The demographic findings for graduation location tell a coherent story. Economic disadvantage and special education status concentrate credential completion at regional institutions — not because of deliberate regional preference but because geographic mobility in credential pursuit is constrained by resources. These graduates will subsequently be more likely to achieve regional employment, not primarily through active regional orientation but through geographic proximity to the regional labor market at the point of credential completion. Gender, by contrast, is irrelevant to graduation location once credential completion has occurred — the gender gap in institution sector does not translate into geographic differences in where credentials are earned.
 
 ::: panel-tabset
 ### `Gender`
@@ -1485,11 +893,8 @@ data <- master.original %>%
 tab_xtab(var.row = data$ps.grad.location,
          var.col = data$Gender,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.location, Gender) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/Demographics/Gender.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/Demographics/gender.html")
 ```
 
 ### `economic.status`
@@ -1498,11 +903,8 @@ data %>%
 tab_xtab(var.row = data$ps.grad.location,
          var.col = data$economic.status,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.location, economic.status) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/Demographics/economic-status.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/Demographics/economic-status.html")
 ```
 
 ### `RaceEthnicity`
@@ -1512,11 +914,8 @@ data %>%
 tab_xtab(var.row = data$ps.grad.location,
          var.col = data$RaceEthnicity,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.location, RaceEthnicity) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/Demographics/RaceEthnicity.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/Demographics/RaceEthnicity.html")
 ```
 
 ### `SpecialEdStatus`
@@ -1525,11 +924,8 @@ data %>%
 tab_xtab(var.row = data$ps.grad.location,
          var.col = data$SpecialEdStatus,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.location, SpecialEdStatus) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/Demographics/SpecialEdStatus.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/Demographics/SpecialEdStatus.html")
 ```
 :::
 
@@ -1539,48 +935,24 @@ data %>%
 
 Here are the variables we will be exploring;
 
-- `Dem_Desc`
+- `edr`
 - `avg.unemp.rate`
-- `avg.wage.pct.state`
 
-### Cramer’s V / ANOVA Results (ps.grad.location \~ HS Characteristics)
+**HIGH SCHOOL CHARACTERISTICS AND POSTSECONDARY GRADUATION LOCATION (Among credential completers only, n=47,959)**
 
-- **Dem_Desc**: V = **0.033** → **Very weak association**
-- **avg.unemp.rate**: F = **19.42**, p \< 0.001 → Statistically significant, but very small effect
-- **avg.wages.pct.state**: F = **174.51**, p \< 0.001 → Statistically significant, modest effect
+EDR shows a meaningful association with graduation location (V=0.084). EDR 10 graduates complete credentials outside Minnesota at a substantially higher rate (32.7% vs. 24.4% for EDR 9) and at a lower rate within MN outside the region (27.6% vs. 33.0%). Regional completion rates are similar across EDRs (39.7% vs. 42.6%). This is a notable finding — EDR 10 graduates who complete credentials are more geographically mobile, with a greater tendency to pursue and complete out-of-state credentials. EDR 9 graduates who complete credentials are more likely to do so at in-state but out-of-region institutions, consistent with the Stage 3 finding that EDR 9 showed stronger meaningful MN employment at Years 5 and 10. The EDR difference in graduation location is the likely mechanism underlying that workforce outcome gap — EDR 9 completers earn credentials in Minnesota and stay in Minnesota, while EDR 10 completers are more likely to leave the state entirely.
 
-**Ranking (strongest to weakest):**
-
-1.  **avg.wages.pct.state** (clearest differentiation across graduation locations)
-2.  **avg.unemp.rate** (significant but weaker)
-3.  **Dem_Desc** (negligible association)
-
-------------------------------------------------------------------------
-
-### Interpretation of Results
-
-- **Dem_Desc**: Community type (urban, rural, mixed) shows very little relationship to graduation location. Students from all community types distribute fairly evenly across **Southern MN, other MN, and out-of-state completions**.
-- **avg.unemp.rate**: Students from counties with **lower unemployment rates** are slightly more likely to graduate outside the region, while those from higher unemployment counties lean modestly toward **regional completions**.
-- **avg.wages.pct.state**: Students from areas with **higher relative wages** are more likely to graduate outside Southern MN (in Minnesota or out-of-state), while students from **lower-wage counties** are disproportionately represented in **Southern MN completions**, indicating stronger regional attachment.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-High school context measures show that **local economic strength influences postsecondary graduation location more than rural/urban school setting**. Students from stronger wage environments are more mobile, completing outside the region, while those from lower-wage areas are anchored in **Southern MN institutions**. This supports the broader pattern that **regional retention is tied to constrained opportunity environments**, while advantaged areas encourage mobility.
+Average local unemployment rate shows a statistically significant but very modest association with graduation location (F=19.4). MN graduates come from the highest unemployment communities, and both outside MN and regional graduates come from lower unemployment areas — with regional and outside MN graduates essentially indistinguishable from each other (difference=-0.006, p=0.907). The mean differences are small in absolute terms, and the practical significance of this finding is limited. Higher local unemployment is modestly associated with completing credentials within Minnesota rather than outside it, which may reflect that graduates from weaker labor markets are more likely to attend in-state institutions out of cost and access constraints — but the effect is too small to carry much interpretive weight.
 
 ::: panel-tabset
-### `Dem_Desc`
+### `edr`
 
 ```{r}
 tab_xtab(var.row = data$ps.grad.location,
-         var.col = data$Dem_Desc,
+         var.col = data$edr,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.location, Dem_Desc) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/High school characteristics/Dem-Desc.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/High school characteristics/edr.html")
 ```
 
 ### `avg.unemp.rate`
@@ -1588,28 +960,21 @@ data %>%
 ```{r}
 summary <- aov(avg.unemp.rate ~ ps.grad.location, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.location, avg.unemp.rate) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/High school characteristics/avg-unemp-rate.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
 
-```
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/High school characteristics/avg-unemp-rate.xlsx", overwrite = TRUE)
 
-### `avg.wage.pct.state`
-
-```{r}
-summary <- aov(avg.wages.pct.state ~ ps.grad.location, data = data)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-data %>%
-  select(ps.grad.location, avg.wages.pct.state) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/High school characteristics/acg-wages-pct-state.csv")
 ```
 :::
 
@@ -1619,9 +984,11 @@ data %>%
 
 Here are the variables we will explore.
 
+- `took.ACT`
+
 - `ACTCompositeScore`
 
-- `pseo.participant`
+- `ap.exam`
 
 - `cte.achievement`
 
@@ -1633,71 +1000,63 @@ Here are the variables we will explore.
 
 - `MCA.S`
 
-### Cramer’s V / ANOVA Results (ps.grad.location \~ HS Accomplishments)
+**HIGH SCHOOL ACCOMPLISHMENT VARIABLES AND POSTSECONDARY GRADUATION LOCATION (Among credential completers only, n=47,959)**
 
-- **cte.achievement**: V = **0.082** → **Weak association**
-- **pseo.participant**: V = **0.063** → **Weak association**
-- **ACTCompositeScore**: F = **1537.15**, p \< 0.001 → Significant difference (moderate effect)
-- **MCA Math**: F = **618.89**, p \< 0.001 → Significant difference (modest effect)
-- **MCA Reading**: F = **553.78**, p \< 0.001 → Significant difference (modest effect)
-- **MCA Science**: F = **770.99**, p \< 0.001 → Significant difference (moderate effect)
-- **total.cte.courses.taken**: F = **334.88**, p \< 0.001 → Significant difference (small effect)
+The accomplishment variables reveal a consistent and analytically important pattern: academic achievement and orientation predict out-of-region and out-of-state credential completion, while CTE engagement predicts regional completion — the same sorting mechanism seen throughout the analysis, now operating within the credential completer population.
 
-**Ranking (strongest to weakest):**
+took.ACT shows a moderate association with graduation location (V=0.102). Non-ACT takers complete regional credentials at 51.7% compared to 38.7% for ACT takers, while ACT takers complete outside Minnesota at 31.9% versus just 20.6% for non-takers. MN completion is similar across groups (29.4% vs. 27.6%). ACT participation is associated with geographic mobility in credential completion — those who prepared academically for four-year institutions are more likely to complete credentials outside the region and outside the state.
 
-1.  **ACTCompositeScore** (clearest separation by graduation location)
-2.  **MCA Science** (next strongest academic signal)
-3.  **MCA Math**
-4.  **MCA Reading**
-5.  **total.cte.courses.taken** (significant but modest)
-6.  **cte.achievement** (weak categorical effect)
-7.  **pseo.participant** (weak categorical effect)
+ap.exam shows the strongest categorical association with graduation location (V=0.183). AP exam takers complete outside Minnesota at 38.5% compared to 26.1% for non-takers — a gap of 12.4 percentage points — and complete regionally at just 28.3% compared to 46.9% for non-takers. MN completion is modestly higher for AP takers (33.2% vs. 27.1%). AP participation is the strongest academic achievement indicator of out-of-state credential completion among all categorical variables examined, consistent with AP takers being among the most academically prepared and geographically mobile graduates.
 
-------------------------------------------------------------------------
+ACT Composite Score shows the largest mean differences across graduation locations (F=1537.1). Outside MN graduates score 0.47 composite points above MN graduates, while regional graduates score 2.24 points below MN graduates and 2.72 points below outside MN graduates. The academic achievement gradient across graduation location is steep and consistent — every composite point increase is associated with a shift away from regional toward MN and out-of-state completion.
 
-### Interpretation of Results
+MCA Math (F=618.9), MCA Reading (F=553.8), and MCA Science (F=771.0) all show the same ordering: outside MN graduates score highest, MN graduates second, and regional graduates lowest. The regional versus outside MN gaps are approximately 0.33 (Math), 0.25 (Reading), and 0.35 (Science) standard deviations — meaningful differences that are consistent across all three assessments. Outside MN graduates score modestly but significantly above MN graduates on all three measures, suggesting that even within the out-of-region completer population, academic achievement continues to sort graduates geographically.
 
-- **Academic Achievement (ACT & MCA scores)**: Students with higher test scores are disproportionately represented among **out-of-region completions** (both other MN and out-of-state). Lower-scoring students are more concentrated in **regional completions**, reinforcing the divide between mobility and local retention.
-- **CTE Engagement (cte.achievement & total courses)**: Students with higher levels of CTE involvement (more courses, concentrator/completor status) are more likely to graduate in **Southern MN**, anchoring them to the region. Non-CTE peers lean toward completions outside the region.
-- **PSEO Participation**: PSEO students are modestly more likely to graduate **outside the region** (MN or out-of-state), consistent with the program’s alignment to 4-year pathways and higher academic mobility.
+cte.achievement shows a moderate association in the expected direction (V=0.082). CTE concentrators and completors graduate regionally at 45.9% compared to 32.8% for No CTE graduates — a gap of 13.1 percentage points. The gradient is monotonic: concentrators show the highest regional completion, participants intermediate (42.8%), and No CTE graduates the lowest. Outside MN completion shows the reverse pattern — No CTE graduates complete outside the state at 35.0% compared to 26.9% for concentrators. This confirms that CTE engagement is associated with geographic proximity in credential completion just as it is in workforce attachment, and that the absence of CTE engagement predicts geographic departure at the credential stage as well as the employment stage.
 
-------------------------------------------------------------------------
-
-### Conclusion
-
-High school accomplishments divide students between **regional and mobile pathways**.
-
-- **Higher academic achievement (ACT, MCA)** and **PSEO participation** align with **out-of-region completions**, fueling statewide or national mobility.
-- **CTE engagement** is linked to **regional completions in Southern MN**, anchoring students more tightly to the local workforce.
-
-In short: **academic rigor drives mobility, while CTE anchors students regionally**, reinforcing the dual-pipeline dynamic observed across the broader analysis.
+The accomplishment findings for graduation location are among the most analytically important across all postsecondary dependent variables. They establish that the geographic sorting visible in workforce outcomes at Years 5 and 10 begins at the credential completion stage — high academic achievement and low CTE engagement predict out-of-state completion, while CTE engagement predicts regional completion. The chain from high school to workforce is now fully traceable: CTE engagement → regional credential completion → regional employment; high academic achievement → out-of-state credential completion → out-of-state employment or no MN record.
 
 ::: panel-tabset
+### `took.ACT`
+
+```{r}
+tab_xtab(var.row = data$ps.grad.location,
+         var.col = data$took.ACT,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/High school accomplishments/took-ACT.html")
+```
+
 ### `ACTCompositeScore`
 
 ```{r}
 summary <- aov(ACTCompositeScore ~ ps.grad.location, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.location, ACTCompositeScore) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/High school accomplishments/ACTCompositeScore.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/High school accomplishments/ACTCompositeScore.xlsx", overwrite = TRUE)
+
 ```
 
-### `pseo.participant`
+### `ap.exam`
 
 ```{r}
 tab_xtab(var.row = data$ps.grad.location,
-         var.col = data$pseo.participant,
+         var.col = data$ap.exam,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.location, pseo.participant) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/High school accomplishments/pseo-participant.csv")
+         show.col.prc = TRUE,
+        file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/High school accomplishments/ap-exam.html")
 ```
 
 ### `cte.achievement`
@@ -1706,11 +1065,8 @@ data %>%
 tab_xtab(var.row = data$ps.grad.location,
          var.col = data$cte.achievement,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(ps.grad.location, cte.achievement) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/High school accomplishments/cte-achievement.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/High school accomplishments/cte-achievement.html")
 ```
 
 ### `total.cte.courses.taken`
@@ -1718,13 +1074,20 @@ data %>%
 ```{r}
 summary <- aov(total.cte.courses.taken ~ ps.grad.location, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.location, total.cte.courses.taken) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/High school accomplishments/total-cte-courses-taken.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/High school characteristics/total-cte-courses-taken.xlsx", overwrite = TRUE)
 ```
 
 ### `MCA.M`
@@ -1732,13 +1095,20 @@ data %>%
 ```{r}
 summary <- aov(MCA.M ~ ps.grad.location, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.location, MCA.M) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/High school accomplishments/MCA-M.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/High school accomplishments/MCA-M.xlsx", overwrite = TRUE)
 ```
 
 ### `MCA.R`
@@ -1746,13 +1116,20 @@ data %>%
 ```{r}
 summary <- aov(MCA.R ~ ps.grad.location, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.location, MCA.R) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/High school accomplishments/MCA-R.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/High school accomplishments/MCA-R.xlsx", overwrite = TRUE)
 
 ```
 
@@ -1761,73 +1138,26 @@ data %>%
 ```{r}
 summary <- aov(MCA.S ~ ps.grad.location, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(ps.grad.location, MCA.S) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/PS grad location/High school accomplishments/MCA-S.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-grad-location/High school accomplishments/MCA-S.xlsx", overwrite = TRUE)
 ```
 :::
 
 <br>
 
-# `highest.cred.level`
-
-## Total Summary: Predictors of Postsecondary Highest Credential Attainment (highest.cred.level)
-
-Students diverge across credential levels — **no college, some college, sub-associate, associate, and bachelor’s or higher** — along clear demographic, academic, and programmatic lines. The strongest pattern is that **academic rigor and PSEO participation drive bachelor’s attainment and mobility**, while **economic disadvantage, special education needs, and CTE engagement steer students toward sub-baccalaureate or associate pathways**. This has direct implications for regional workforce development, since **sub-baccalaureate and associate completions are most strongly tied to meaningful employment in Southern MN**.
-
-------------------------------------------------------------------------
-
-### **1. Strong Predictors of Credential Level**
-
-These variables show moderate to strong associations and consistently differentiate between bachelor’s-or-higher versus sub-baccalaureate outcomes.
-
-| Variable | Type | Key Insights |
-|----|----|----|
-| SpecialEdStatus | Demographic | SPED students overwhelmingly concentrated in **no college or sub-associate levels**, rarely achieving bachelor’s or higher. |
-| Economic Status | Demographic | Low-income students disproportionately in **sub-associate and no-college categories**; non–low-income peers dominate higher degrees. |
-| ACTCompositeScore | Accomplishment (continuous) | Higher scores strongly linked to **bachelor’s or higher attainment**. |
-| MCA Reading, Math, Science | Accomplishment (continuous) | Higher MCA scores correlate with bachelor’s attainment; lower scores with **associate or less**. |
-| PSEO Participation | Accomplishment (categorical) | PSEO students far more likely to reach **bachelor’s or higher**, reinforcing early college exposure as a pipeline to advanced credentials. |
-
-------------------------------------------------------------------------
-
-### **2. Moderate Predictors — Secondary but Meaningful**
-
-These variables add important nuance but have weaker overall effects.
-
-| Variable | Type | Key Insights |
-|----|----|----|
-| RaceEthnicity | Demographic | White and Asian/PI students more likely to reach **bachelor’s or higher**; Black, Hispanic, and American Indian students concentrated in **lower-credential categories**. |
-| Gender | Demographic | Females more likely to achieve **bachelor’s or higher**, while males are more often in sub-associate categories. |
-| total.cte.courses.taken | Accomplishment (continuous) | More CTE courses link to higher rates of **associate attainment**, less often bachelor’s. |
-| cte.achievement | Accomplishment (categorical) | CTE concentrators/completors most likely to earn **associate degrees**, with lower bachelor’s representation. |
-| avg.unemp.rate | HS Characteristic (continuous) | Higher unemployment counties see lower bachelor’s attainment, more sub-associate outcomes. |
-| avg.wages.pct.state | HS Characteristic (continuous) | Higher-wage counties foster greater bachelor’s attainment; lower-wage areas cluster in associate or less. |
-
-------------------------------------------------------------------------
-
-### **3. Weak Predictors — Limited Independent Effect**
-
-| Variable | Type | Notes |
-|----|----|----|
-| Dem_Desc | HS Characteristic | Urban/rural/mixed school setting shows only weak differences once other factors are considered. |
-
-------------------------------------------------------------------------
-
-### **Conclusion**
-
-Credential attainment reflects a stratified system:
-
-- **Academic rigor and PSEO participation drive bachelor’s and higher attainment**, fueling pathways to statewide or out-of-state mobility.
-- **CTE engagement, low-income status, SPED identification, and disadvantaged local economies anchor students in associate or sub-associate outcomes**, which are most strongly tied to **regional workforce retention**.
-
-In short: **the highest credential earned is powerfully shaped by both individual disadvantage and academic preparation.** While bachelor’s-or-higher degrees signal mobility, **associate pathways linked to CTE and disadvantage markers remain the backbone of regional employment in Southern MN**.
-
-<br>
+# `highest.cred.level` - college completers only
 
 ## Demographics
 
@@ -1838,56 +1168,33 @@ Here are the variables we will be exploring;
 - `RaceEthnicity`
 - `SpecialEdStatus`
 
-### Cramer’s V Scores and Strength (highest.cred.level \~ Demographics)
+**DEMOGRAPHIC VARIABLES AND HIGHEST CREDENTIAL LEVEL (Among credential completers only, n=48,162)**
 
-- **SpecialEdStatus**: V = **0.311** → **Moderate-to-Strong association**
-- **Economic Status**: V = **0.294** → **Moderate association**
-- **RaceEthnicity**: V = **0.201** → **Moderate association**
-- **Gender**: V = **0.156** → **Weak-to-Moderate association**
+Among credential completers, 68.2% hold a bachelor's degree or higher and 31.8% hold a sub-baccalaureate credential. Note the sample size here is 48,162 rather than 47,959 — the attending ps category is included here since highest.cred.level captures credential status at time of observation rather than final credential location.
 
-**Ranking (strongest to weakest):**
+Gender shows a modest but meaningful association with credential level (φ=0.078). Females complete bachelor's or higher credentials at a higher rate (71.4% vs. 64.1% for males), while males are more likely to hold sub-baccalaureate credentials (35.9% vs. 28.6%). This is directly consistent with the institution sector finding — males' greater concentration in public 2-year institutions translates into higher sub-baccalaureate credential attainment. Given the Stage 3 finding that sub-baccalaureate completion predicts regional employment, this gender difference in credential level is part of the mechanism behind males' modest advantage in meaningful regional employment throughout the observation window.
 
-1.  **SpecialEdStatus** (0.311)
-2.  **Economic Status** (0.294)
-3.  **RaceEthnicity** (0.201)
-4.  **Gender** (0.156)
+Economic status shows a strong association with credential level (φ=0.174). Non-low-income graduates complete bachelor's or higher credentials at 72.0% compared to 50.8% for low-income graduates — a gap of 21.2 percentage points. Low-income completers hold sub-baccalaureate credentials at nearly twice the rate of non-low-income completers (49.2% vs. 28.0%). This finding reinforces the economic access narrative — among those who complete credentials, economic disadvantage is strongly associated with stopping at the sub-baccalaureate level rather than continuing to a bachelor's degree or higher.
 
-------------------------------------------------------------------------
+Special education status shows an equally strong association with credential level (φ=0.174). Special education completers hold sub-baccalaureate credentials at 70.0% — more than double the rate for non-special education completers (30.1%). Only 30.0% of special education completers reach bachelor's or higher, compared to 69.9% of non-special education completers. This is one of the starkest demographic contrasts in the entire postsecondary analysis and confirms that when special education graduates do complete credentials, they do so overwhelmingly at the sub-baccalaureate level.
 
-### Interpretation of Results
+Race and ethnicity shows the strongest demographic association with credential level (V=0.203). The Unknown category again shows an anomalous pattern — 95.4% sub-baccalaureate — which further confirms this group captures a specific non-traditional student population. Among identified groups, Asian/PI graduates show the highest bachelor's or higher completion rate (77.0%), followed by White (70.0%), American Indian (58.0%), Black (59.2%), and Hispanic (49.4%) graduates. Hispanic graduates are the only identified racial or ethnic group where a majority of completers hold sub-baccalaureate credentials (50.6%). The racial and ethnic gradient in credential level is consistent with the economic access constraints and institution sector patterns identified above — minority graduates who complete credentials do so at sub-baccalaureate levels at substantially higher rates than White and Asian/PI graduates.
 
-- **SpecialEdStatus**: SPED students are heavily concentrated in **no college** or **less than associate degree** categories, with very low representation at the bachelor’s level or higher. Non-SPED peers are far more likely to reach **bachelor’s degrees and beyond**.
-- **Economic Status**: Low-income students are less likely to achieve a **bachelor’s or higher credential**, and more likely to stop at **no college or sub-associate levels**. Non–low-income students dominate higher credential attainment.
-- **RaceEthnicity**: Racial gaps are clear. **White and Asian/PI students** are much more likely to earn a **bachelor’s degree or higher**, while **Black, Hispanic, and American Indian students** are more concentrated in **no college, some college, or sub-associate levels**.
-- **Gender**: Females are somewhat more likely to achieve a **bachelor’s or higher**, while males are more represented in **no college or less than associate levels**. Differences are meaningful but smaller than income or SPED status.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-**Highest credential level is strongly patterned by disadvantage markers.**
-
-- **SpecialEdStatus and economic status** are the most powerful predictors, with SPED and low-income students disproportionately clustered in lower-credential outcomes.
-- **Race/ethnicity** shows persistent gaps, with historically marginalized groups less likely to achieve higher degrees.
-- **Gender** plays a smaller but notable role, with females outperforming males in bachelor’s and higher attainment.
-
-In short: **the pathway to higher credentials is strongly stratified by socioeconomic, racial, and special education factors**, shaping long-term employment opportunities and mobility.
+The demographic findings for credential level tell a consistent and reinforcing story. Economic disadvantage, special education status, male gender, and most minority racial and ethnic identities are all associated with sub-baccalaureate rather than baccalaureate credential attainment among completers. Given the non-linear relationship between credential level and regional employment identified in Stage 3 — where sub-baccalaureate completion predicts the highest regional employment rates — these patterns indicate that demographic disadvantage, while limiting access to four-year credentials, does not prevent credential completers from achieving regional workforce attachment. In fact, it may channel them toward the credential type most strongly associated with it.
 
 ::: panel-tabset
 ### `Gender`
 
 ```{r}
 data <- master.original %>%
-  filter(!highest.cred.level %in% c("Attending ps"))
+  filter(!highest.cred.level %in% c("Attending ps", "Did not graduate ps"))
 
 tab_xtab(var.row = data$highest.cred.level,
          var.col = data$Gender,
          show.exp = TRUE,
-         show.col.prc = TRUE)
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/Demographics/gender.html")
 
-data %>%
-  select(highest.cred.level, Gender) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/Demographics/Gender.csv")
 ```
 
 ### `economic.status`
@@ -1896,11 +1203,8 @@ data %>%
 tab_xtab(var.row = data$highest.cred.level,
          var.col = data$economic.status,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(highest.cred.level, economic.status) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/Demographics/economic-status.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/Demographics/economic-status.html")
 ```
 
 ### `RaceEthnicity`
@@ -1910,11 +1214,8 @@ data %>%
 tab_xtab(var.row = data$highest.cred.level,
          var.col = data$RaceEthnicity,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(highest.cred.level, RaceEthnicity) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/Demographics/RaceEthnicity.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/Demographics/RaceEthnicity.html")
 ```
 
 ### `SpecialEdStatus`
@@ -1923,11 +1224,8 @@ data %>%
 tab_xtab(var.row = data$highest.cred.level,
          var.col = data$SpecialEdStatus,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(highest.cred.level, SpecialEdStatus) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/Demographics/SpecialEdStatus.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/Demographics/SpecialEdStatus.html")
 ```
 :::
 
@@ -1939,48 +1237,23 @@ Here are the variables we will be exploring;
 
 - `Dem_Desc`
 - `avg.unemp.rate`
-- `avg.wage.pct.state`
 
-### Cramer’s V / ANOVA Results (highest.cred.level \~ HS Characteristics)
+**HIGH SCHOOL CHARACTERISTICS AND HIGHEST CREDENTIAL LEVEL (Among credential completers only, n=48,162)**
 
-- **Dem_Desc**: V = **0.051** → **Weak association**
-- **avg.unemp.rate**: F = **658.20**, p \< 0.001 → Statistically significant, moderate effect (given large N)
-- **avg.wages.pct.state**: F = **184.82**, p \< 0.001 → Statistically significant, modest effect
+EDR shows a weak but statistically significant association with credential level (φ=0.042). EDR 10 graduates complete bachelor's or higher credentials at a modestly higher rate (69.5% vs. 65.1% for EDR 9), while EDR 9 graduates are somewhat more likely to hold sub-baccalaureate credentials (34.9% vs. 30.5%). The difference is small in practical terms but consistent with the institution sector and graduation location patterns seen earlier — EDR 9 graduates who complete credentials are somewhat more concentrated in sub-baccalaureate pathways, which in turn are associated with MN rather than out-of-state employment, again reinforcing the mechanism behind the EDR 9 meaningful MN employment advantage seen in Stage 3.
 
-**Ranking (strongest to weakest):**
-
-1.  **avg.unemp.rate** (clearest differentiation in highest credential level)
-2.  **avg.wages.pct.state** (significant but smaller effect)
-3.  **Dem_Desc** (weak categorical effect)
-
-------------------------------------------------------------------------
-
-### Interpretation of Results
-
-- **Dem_Desc**: Urban, rural, and mixed school settings show only **minor variation** in highest credential attainment. Urban students are slightly more likely to earn **bachelor’s or higher**, while rural/town peers show somewhat more concentration in **sub-baccalaureate or no-college outcomes**, but differences are small.
-- **avg.unemp.rate**: Students from **higher-unemployment counties** are less likely to attain a **bachelor’s degree or higher**, and more likely to stop at **associate or less**. Lower unemployment areas foster higher attainment.
-- **avg.wages.pct.state**: Students from **higher-wage counties** are more likely to achieve a **bachelor’s or higher credential**, while those from lower-wage counties are overrepresented in **sub-associate or no-college categories**.
-
-------------------------------------------------------------------------
-
-### Conclusion
-
-High school contextual factors matter modestly for highest credential attainment. **Local economic conditions (unemployment, wages)** are more influential than school setting, with stronger local economies tied to higher credential levels. Still, their predictive power remains weaker compared to **demographic factors like SPED status, income, and race/ethnicity**.
-
-In short: **economic context nudges students toward or away from higher credentials, but individual-level disadvantage remains the dominant factor shaping credential attainment.**
+Average local unemployment rate shows a statistically significant but negligible association with credential level (F=5.9, p=0.015). Sub-baccalaureate completers come from communities with very slightly lower average unemployment than bachelor's or higher completers (difference=-0.032), but the practical magnitude is essentially zero. Local unemployment rate has no meaningful bearing on what level of credential a graduate ultimately earns. This is consistent with the broader pattern across the high school characteristics group — place-based factors shape whether graduates attempt postsecondary and where they complete credentials, but have little influence on credential level conditional on completion.
 
 ::: panel-tabset
-### `Dem_Desc`
+### `edr`
 
 ```{r}
 tab_xtab(var.row = data$highest.cred.level,
-         var.col = data$Dem_Desc,
+         var.col = data$edr,
          show.exp = TRUE,
-         show.col.prc = TRUE)
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/High school characteristics/edr.html")
 
-data %>%
-  select(highest.cred.level, Dem_Desc) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/High school characteristics/SpecialEdStatus.csv")
 ```
 
 ### `avg.unemp.rate`
@@ -1988,28 +1261,21 @@ data %>%
 ```{r}
 summary <- aov(avg.unemp.rate ~ highest.cred.level, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(highest.cred.level, avg.unemp.rate) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/High school characteristics/avg-unemp-rate.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
 
-```
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/High school characteristics/avg-unemp-rate.xlsx", overwrite = TRUE)
 
-### `avg.wage.pct.state`
-
-```{r}
-summary <- aov(avg.wages.pct.state ~ highest.cred.level, data = data)
-
-summary(summary)
-
-TukeyHSD(summary)
-
-data %>%
-  select(highest.cred.level, avg.wages.pct.state) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/High school characteristics/acg-wages-pct-state.csv")
 ```
 :::
 
@@ -2019,9 +1285,11 @@ data %>%
 
 Here are the variables we will explore.
 
+- `took.ACT`
+
 - `ACTCompositeScore`
 
-- `pseo.participant`
+- `ap.exam`
 
 - `cte.achievement`
 
@@ -2033,68 +1301,64 @@ Here are the variables we will explore.
 
 - `MCA.S`
 
-### Cramer’s V / ANOVA Results (highest.cred.level \~ HS Accomplishments)
+**HIGH SCHOOL ACCOMPLISHMENT VARIABLES AND HIGHEST CREDENTIAL LEVEL (Among credential completers only, n=48,162)**
 
-- **cte.achievement**: V = **0.139** → **Weak-to-Moderate association**
-- **pseo.participant**: V = **0.306** → **Moderate-to-Strong association**
-- **ACTCompositeScore**: F = **4191.07**, p \< 0.001 → Significant difference (very strong effect)
-- **MCA Math**: F = **3161.07**, p \< 0.001 → Significant difference (strong effect)
-- **MCA Reading**: F = **4004.46**, p \< 0.001 → Significant difference (very strong effect)
-- **MCA Science**: F = **2955.15**, p \< 0.001 → Significant difference (strong effect)
-- **total.cte.courses.taken**: F = **1441.68**, p \< 0.001 → Significant difference (moderate effect)
+The accomplishment variables show the strongest and most consistent associations with credential level of any variable group, and the academic achievement versus CTE engagement divide is at its sharpest here.
 
-**Ranking (strongest to weakest):**
+took.ACT shows a very strong association with credential level (φ=0.332). ACT takers complete bachelor's or higher credentials at 74.5% compared to just 30.4% for non-takers — a gap of 44.1 percentage points. Non-takers hold sub-baccalaureate credentials at 69.6% versus 25.5% for ACT takers. Among all categorical accomplishment variables, ACT participation is the single strongest predictor of whether a completer reaches the baccalaureate level.
 
-1.  **ACTCompositeScore** (largest F-statistic, strongest predictor of credential level)
-2.  **MCA Reading** (nearly as strong as ACT)
-3.  **MCA Math**
-4.  **MCA Science**
-5.  **pseo.participant** (categorical, moderate-to-strong effect)
-6.  **total.cte.courses.taken** (moderate association)
-7.  **cte.achievement** (weak-to-moderate categorical effect)
+ap.exam shows an even stronger association (φ=0.292). AP exam takers complete bachelor's or higher at 87.1% — the highest rate of any categorical predictor examined — compared to 58.4% for non-takers. Only 12.9% of AP exam takers stop at the sub-baccalaureate level. AP participation is the clearest high school signal that a graduate will pursue and complete a four-year credential.
 
-------------------------------------------------------------------------
+ACT Composite Score shows the largest continuous variable gap (F=6632.2). Bachelor's or higher completers score 3.98 composite points above sub-baccalaureate completers — a very large difference on a 36-point scale. This is the strongest single continuous variable association in the entire postsecondary analysis.
 
-### Interpretation of Results
+MCA Math (F=4166.8), MCA Reading (F=5113.5), and MCA Science (F=3871.3) all show large and consistent gaps. Sub-baccalaureate completers score approximately 0.56 standard deviations below bachelor's or higher completers on Math, 0.48 below on Reading, and 0.52 below on Science. The consistency across all three assessments reinforces the finding that academic achievement is a powerful and pervasive predictor of credential level among completers.
 
-- **Academic Rigor (ACT & MCA scores)**: Students with higher test scores are overwhelmingly more likely to achieve a **bachelor’s degree or higher**. Lower-scoring students cluster in **associate or less-than-associate categories**, underscoring academic preparation as the single strongest determinant of credential level.
-- **PSEO Participation**: Students who engaged in PSEO are much more likely to earn a **bachelor’s or higher degree**, reflecting the program’s alignment with rigorous, transfer-oriented pathways.
-- **CTE Engagement (cte.achievement & total courses)**: CTE concentrators and students taking more CTE courses are more likely to earn **associate degrees or some college**, and less likely to reach the bachelor’s level. This reflects the program’s orientation toward applied, shorter-term credentials.
+cte.achievement shows a strong association in the opposite direction (V=0.213). CTE concentrators and completors hold sub-baccalaureate credentials at 43.7% — more than double the rate for No CTE graduates (20.0%) and well above CTE participants (30.7%). The gradient is monotonic and steep. No CTE graduates complete bachelor's or higher at 80.0% compared to just 56.3% for CTE concentrators. The association between CTE concentration and sub-baccalaureate credential completion is the strongest inverse relationship in the accomplishment group and directly mirrors the positive association with regional employment seen throughout the analysis.
 
-------------------------------------------------------------------------
+Total CTE courses taken shows a large and highly significant association (F=3780.6). Sub-baccalaureate completers take on average 1.84 more CTE courses than bachelor's or higher completers — nearly two full courses more. This is the largest continuous variable mean difference for any accomplishment variable predicting credential level and confirms the dose-response nature of the CTE engagement and sub-baccalaureate credential relationship.
 
-### Conclusion
-
-**Highest credential level is primarily driven by academic rigor (ACT and MCA scores) and secondarily by PSEO participation.** Students with stronger academics and early college exposure reach bachelor’s or higher degrees at far greater rates. In contrast, **CTE engagement correlates with associate-level attainment**, reinforcing its role as an anchor to regional workforce pathways rather than extended academic pipelines.
-
-In short: **academic rigor and PSEO push students upward into bachelor’s and beyond, while CTE steers students toward sub-baccalaureate credentials**, aligning with the regional employment advantage of 2-year pathways.
+The accomplishment findings for credential level complete the chain of evidence established across the postsecondary analysis. High academic achievement in high school — ACT participation, AP exam participation, high MCA scores — strongly and consistently predicts bachelor's or higher credential attainment. CTE engagement — particularly at the concentrator level and measured as total courses taken — strongly and consistently predicts sub-baccalaureate credential attainment. These two sorting mechanisms operate in opposite directions and are essentially the same mechanisms that sort graduates into out-of-region versus regional employment outcomes a decade later.
 
 ::: panel-tabset
+### `took.ACT`
+
+```{r}
+tab_xtab(var.row = data$highest.cred.level,
+         var.col = data$took.ACT,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/High school accomplishments/took-ACT.html")
+```
+
 ### `ACTCompositeScore`
 
 ```{r}
 summary <- aov(ACTCompositeScore ~ highest.cred.level, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(highest.cred.level, ACTCompositeScore) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/High school accomplishments/ACTCompositeScore.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/High school accomplishments/ACTCompositeScore.xlsx", overwrite = TRUE)
 ```
 
-### `pseo.participant`
+### `ap.exam`
 
 ```{r}
 tab_xtab(var.row = data$highest.cred.level,
-         var.col = data$pseo.participant,
+         var.col = data$ap.exam,
          show.exp = TRUE,
-         show.col.prc = TRUE)
-
-data %>%
-  select(highest.cred.level, pseo.participant) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/High school accomplishments/pseo-participant.csv")
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/High school accomplishments/ap-exam.html")
 ```
 
 ### `cte.achievement`
@@ -2103,11 +1367,9 @@ data %>%
 tab_xtab(var.row = data$highest.cred.level,
          var.col = data$cte.achievement,
          show.exp = TRUE,
-         show.col.prc = TRUE)
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/High school accomplishments/cte-achievement.html")
 
-data %>%
-  select(highest.cred.level, cte.achievement) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/High school accomplishments/cte-achievement.csv")
 ```
 
 ### `total.cte.courses.taken`
@@ -2115,13 +1377,20 @@ data %>%
 ```{r}
 summary <- aov(total.cte.courses.taken ~ highest.cred.level, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(highest.cred.level, total.cte.courses.taken) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/High school accomplishments/total-cte-courses-taken.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/High school accomplishments/total-cte-courses-taken.xlsx", overwrite = TRUE)
 ```
 
 ### `MCA.M`
@@ -2129,13 +1398,20 @@ data %>%
 ```{r}
 summary <- aov(MCA.M ~ highest.cred.level, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(highest.cred.level, MCA.M) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/High school accomplishments/MCA-M.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/High school accomplishments/MCA-M.xlsx", overwrite = TRUE)
 ```
 
 ### `MCA.R`
@@ -2143,13 +1419,20 @@ data %>%
 ```{r}
 summary <- aov(MCA.R ~ highest.cred.level, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(highest.cred.level, MCA.R) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/High school accomplishments/MCA-R.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/High school accomplishments/MCA-R.xlsx", overwrite = TRUE)
 
 ```
 
@@ -2158,81 +1441,405 @@ data %>%
 ```{r}
 summary <- aov(MCA.S ~ highest.cred.level, data = data)
 
-summary(summary)
+summary
+
+anova_df <- broom::tidy(summary)
 
 TukeyHSD(summary)
 
-data %>%
-  select(highest.cred.level, MCA.S) %>%
-  write_csv(., "Data/ChatGPT/Post-secondary ct/Highest cred level/High school accomplishments/MCA-S.csv")
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/highest-cred-level/High school accomplishments/MCA-S.xlsx", overwrite = TRUE)
 ```
 :::
 
 <br>
 
-# Grand Synthesis: Predictors of Postsecondary Pathways and Their Relationship to Regional Employment
+# `ps.pathways` - college completers only
 
-Across all four postsecondary outcomes — **attended.ps, ps.grad, ps.grad.InstitutionSector, ps.grad.location, and highest.cred.level** — consistent patterns emerge about which factors shape educational attainment and how these pathways tie into **regional workforce retention versus mobility and disconnection**.
+## Demographics
 
-The evidence is clear: **postsecondary experiences are the strongest predictors of long-term employment outcomes**, but they are deeply influenced by demographic background, high school context, and student accomplishments. This creates a **dual-pipeline system**: one that anchors students to Southern MN through CTE and sub-baccalaureate credentials, and another that channels academically strong students into statewide or national mobility through 4-year and higher pathways.
+Here are the variables we will be exploring;
 
-------------------------------------------------------------------------
+- `Gender`
+- `economic.status`
+- `RaceEthnicity`
+- `SpecialEdStatus`
 
-## **1. Attending Postsecondary Education**
+**DEMOGRAPHIC VARIABLES AND POSTSECONDARY PATHWAY (Among credential completers only, n=47,959)**
 
-- **Key Predictors**: Economic status (low-income less likely to attend), race/ethnicity (persistent gaps), and special education status (lower attendance).
-- **Takeaway**: Disadvantaged students are disproportionately less likely to enroll in PS at all, putting them at high risk of long-term disconnection.
+The ps.pathway variable combines credential level and graduation location into six categories: sub-baccalaureate region (19.2%), bachelor or higher region (21.3%), sub-baccalaureate MN (7.6%), bachelor or higher MN (21.5%), sub-baccalaureate outside MN (4.8%), and bachelor or higher outside MN (25.5%). This is the most analytically complete postsecondary outcome variable and the one that most directly maps onto the three workforce pathway framework.
 
-------------------------------------------------------------------------
+Gender shows a moderate association with ps.pathway (V=0.086). The most notable differences are in sub-baccalaureate regional completion — males complete at 20.9% compared to 17.9% for females — and bachelor or higher regional completion — females at 23.1% compared to 19.1% for males. Females show modestly higher bachelor or higher MN completion (22.4% vs. 20.3%). The out-of-state pathways are essentially equivalent across genders (bachelor or higher outside MN: 26.0% female vs. 24.9% male). The gender difference is primarily in the regional pathways — males are more concentrated in sub-baccalaureate regional completion while females are more concentrated in bachelor or higher regional completion — rather than in geographic mobility.
 
-## **2. Postsecondary Graduation (ps.grad)**
+Economic status shows a strong association with ps.pathway (V=0.191). Low-income graduates are dramatically more concentrated in sub-baccalaureate regional completion (32.0% vs. 16.4%) and sub-baccalaureate MN completion (10.9% vs. 6.9%), while non-low-income graduates dominate bachelor or higher outside MN completion (28.1% vs. 13.8%) and bachelor or higher MN completion (22.6% vs. 16.6%). Bachelor or higher regional completion is essentially equal across economic status groups (21.5% vs. 20.6%). The economic gradient is concentrated in credential level and out-of-state geographic mobility — low-income completers are channeled toward sub-baccalaureate regional and MN pathways, while non-low-income completers access four-year and out-of-state pathways at substantially higher rates.
 
-- **Key Predictors**: Economic status and SPED remain barriers to completion; racial gaps persist; academic readiness improves odds of graduating.
-- **Takeaway**: Simply **completing** PS dramatically reduces disconnection and boosts employment. Non-completers remain the most vulnerable group in the workforce pipeline.
+Special education status shows a strong association with ps.pathway (V=0.175). Special education completers are concentrated in sub-baccalaureate regional completion (42.7% vs. 18.1%) and sub-baccalaureate MN completion (17.6% vs. 7.2%), while showing very low rates of bachelor or higher MN (7.0% vs. 22.2%) and bachelor or higher outside MN (11.9% vs. 26.1%) completion. The pattern is the most extreme of any demographic variable — among special education graduates who complete credentials, over 60% do so through sub-baccalaureate pathways, and the majority of those complete regionally.
 
-------------------------------------------------------------------------
+Race and ethnicity shows a moderate association (V=0.097) with substantial within-group variation. The Unknown category again shows an anomalous pattern — 57.2% sub-baccalaureate regional and 23.5% sub-baccalaureate MN — consistent with a non-traditional student population concentrated in community and technical colleges. Among identified groups, Hispanic graduates show the highest sub-baccalaureate regional rate (38.5%) followed by Black (29.0%) and American Indian (22.2%) graduates, all substantially above White (17.7%) and Asian/PI (17.1%) graduates. Bachelor or higher outside MN is highest for Asian/PI (27.5%) and White (26.5%) graduates, with substantially lower rates for Black (15.7%), Hispanic (15.9%), and American Indian (16.0%) graduates. American Indian graduates show the highest bachelor or higher MN rate (32.1%), followed by Asian/PI (30.2%), consistent with in-state four-year credential completion being a relatively common pathway for these groups among those who reach the baccalaureate level.
 
-## **3. Institution Sector of Graduation (ps.grad.InstitutionSector)**
+The ps.pathway findings synthesize the patterns seen across the individual postsecondary dependent variables. Economic disadvantage and special education status concentrate graduates in sub-baccalaureate regional pathways — the credential completion route most directly associated with regional workforce attachment in Stage 3. Non-low-income and non-special-education graduates access four-year and out-of-state pathways at substantially higher rates, which the Stage 3 findings show are associated with out-of-region employment and geographic departure from Minnesota. Gender differences are modest and concentrated in the regional pathways rather than geographic mobility. Racial and ethnic minority graduates — particularly Hispanic and Black — show elevated sub-baccalaureate regional completion rates that, combined with the Stage 3 workforce findings, suggest these graduates are more likely to achieve regional workforce attachment through the college completer pathway than their White and Asian/PI peers.
 
-- **Key Predictors**:
-  - **Academic rigor and PSEO** → 4-year completions.
-  - **CTE engagement, SPED, and low-income** → 2-year completions.
-- **Takeaway**: Institution type sorts students into applied versus academic pathways. Since **2-year completions are more strongly tied to regional employment**, CTE and disadvantage groups inadvertently form the backbone of Southern MN’s workforce, while academically strong students pursue more mobile 4-year pathways.
+::: panel-tabset
+### `Gender`
 
-------------------------------------------------------------------------
+```{r}
+data <- master.original %>%
+  filter(!highest.cred.level %in% c("Did not graduate ps", "Attending ps"),
+         ps.grad.location != "Did not graduate ps") %>%
+  mutate(highest.cred.level = as_factor(highest.cred.level),
+         ps.grad.location = as_factor(ps.grad.location),
+         ps.pathway = case_when(
+    
+    # Never attended or attended but did not graduate
+    highest.cred.level == "Did not graduate ps" & 
+      ps.grad.location == "Did not grad" ~ "Did not graduate ps",
+    highest.cred.level == "No college"         ~ "Did not graduate ps",
+    
+    # Sub-baccalaureate by location
+    highest.cred.level == "Less than Bachelors" & 
+      ps.grad.location == "PS grad region"      ~ "Sub-baccalaureate - region",
+    highest.cred.level == "Less than Bachelors" & 
+      ps.grad.location == "PS grad MN"          ~ "Sub-baccalaureate - MN",
+    highest.cred.level == "Less than Bachelors" & 
+      ps.grad.location == "PS grad outside MN"  ~ "Sub-baccalaureate - outside MN",
+    
+    # Bachelor or higher by location
+    highest.cred.level == "Bachelors or higher" & 
+      ps.grad.location == "PS grad region"      ~ "Bachelor or higher - region",
+    highest.cred.level == "Bachelors or higher" & 
+      ps.grad.location == "PS grad MN"          ~ "Bachelor or higher - MN",
+    highest.cred.level == "Bachelors or higher" & 
+      ps.grad.location == "PS grad outside MN"  ~ "Bachelor or higher - outside MN",
+    
+    # Currently attending - treat as its own category
+    ps.grad.location == "Attending ps"          ~ "Attending ps",
+    highest.cred.level == "Attending ps"        ~ "Attending ps",
+    
+    TRUE ~ NA_character_),
+    across(c("ps.grad":"ps.grad.location"), factor),
+    ps.pathway = fct_relevel(ps.pathway, "Sub-baccalaureate - region", "Bachelor or higher - region", "Sub-baccalaureate - MN", "Bachelor or higher - MN", "Sub-baccalaureate - outside MN", "Bachelor or higher - outside MN"))
 
-## **4. Location of Graduation (ps.grad.location)**
+tab_xtab(var.row = data$ps.pathway,
+         var.col = data$Gender,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/Demographics/gender.html")
 
-- **Key Predictors**:
-  - **Disadvantaged students (low-income, SPED, marginalized race/ethnicity)** → more likely to graduate in **Southern MN**.
-  - **High scorers and PSEO participants** → more likely to graduate outside the region (other MN or out-of-state).
-  - **Local economic conditions** (lower wages, higher unemployment) → stronger Southern MN completions.
-- **Takeaway**: Regional completions are most common among disadvantaged groups and CTE students, reinforcing their role in regional workforce stability.
+```
 
-------------------------------------------------------------------------
+### `economic.status`
 
-## **5. Highest Credential Earned (highest.cred.level)**
+```{r}
+tab_xtab(var.row = data$ps.pathway,
+         var.col = data$economic.status,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/Demographics/economic.status.html")
+```
 
-- **Key Predictors**:
-  - **Academic rigor (ACT, MCA)** and **PSEO** → bachelor’s or higher.
-  - **CTE engagement, low-income, SPED, disadvantaged counties** → associate or sub-associate.
-- **Takeaway**: Credential level is the clearest stratifier of opportunity. **Bachelor’s+ aligns with mobility**, while **associate/sub-associate aligns with regional employment**.
+### `RaceEthnicity`
 
-------------------------------------------------------------------------
+```{r}
 
-### **Overall Conclusion**
+tab_xtab(var.row = data$ps.pathway,
+         var.col = data$RaceEthnicity,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/Demographics/RaceEthnicity.html")
+```
 
-The postsecondary pipeline is shaped by **two reinforcing forces**:
+### `SpecialEdStatus`
 
-1.  **Mobility Pipeline**:
-    - Driven by **academic rigor and PSEO**.
-    - Leads to **4-year+ degrees, completions outside the region, and statewide mobility**.
-    - Most common among advantaged, higher-scoring students.
-2.  **Regional Pipeline**:
-    - Driven by **CTE engagement, 2-year institutions, economic disadvantage, SPED, and lower-wage/unemployment counties**.
-    - Leads to **associate/sub-associate degrees and Southern MN completions**, strongly tied to **meaningful regional employment**.
-    - Most common among disadvantaged students who remain anchored locally.
+```{r}
+tab_xtab(var.row = data$ps.pathway,
+         var.col = data$SpecialEdStatus,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/Demographics/SpecialEdStatus.html")
+```
+:::
 
-In short: **Southern MN’s workforce stability relies heavily on the regional pipeline of 2-year and CTE-driven pathways**, which disproportionately serve low-income and SPED students. Meanwhile, academically strong and advantaged students pursue 4-year and higher credentials, fueling statewide and out-of-state mobility.
+<br>
 
-**Policy Implication**: To strengthen the regional workforce, interventions should both (1) support disadvantaged students in completing and leveraging their 2-year pathways and (2) create incentives for academically strong students to remain engaged in the region after completing higher degrees.
+## High School Characteristics
+
+Here are the variables we will be exploring;
+
+- `Dem_Desc`
+- `avg.unemp.rate`
+
+**HIGH SCHOOL CHARACTERISTICS AND POSTSECONDARY PATHWAY (Among credential completers only, n=47,959)**
+
+EDR shows a meaningful association with ps.pathway (V=0.125). The most striking difference is in sub-baccalaureate MN completion — EDR 9 graduates complete at 11.6% compared to just 6.0% for EDR 10 graduates, nearly double the rate. EDR 10 graduates show substantially higher bachelor or higher outside MN completion (27.9% vs. 19.8%), consistent with the geographic mobility pattern identified in earlier analyses. Bachelor or higher regional completion is modestly higher for EDR 9 (24.3% vs. 20.1%), while sub-baccalaureate regional completion is similar across EDRs (19.5% vs. 18.4%). Bachelor or higher MN completion is essentially identical (21.6% vs. 21.3%). The EDR pattern clarifies the mechanism underlying the Stage 3 workforce outcome differences — EDR 9 graduates who complete credentials are more likely to do so at sub-baccalaureate and baccalaureate levels within Minnesota, producing stronger in-state out-of-region employment, while EDR 10 graduates are more likely to complete credentials outside Minnesota and leave the state entirely.
+
+Average local unemployment rate shows a statistically significant association with ps.pathway (F=49.1) with a clear ordering. Sub-baccalaureate regional graduates come from communities with the lowest average unemployment of any pathway group. All other pathways show significantly higher unemployment rates, with sub-baccalaureate MN (difference=0.315), sub-baccalaureate outside MN (difference=0.291), and bachelor or higher region (difference=0.227) all substantially above the regional sub-baccalaureate group. Sub-baccalaureate MN and sub-baccalaureate outside MN are not significantly different from each other (difference=-0.024, p=0.987). Bachelor or higher outside MN (difference=0.095) is significantly above sub-baccalaureate regional but below all other sub-baccalaureate pathways.
+
+This is a counterintuitive finding worth careful interpretation. Graduates who complete sub-baccalaureate credentials regionally come from the strongest local labor markets — not the weakest. This suggests that regional sub-baccalaureate completion is not primarily driven by economic necessity or lack of alternatives, but rather by a genuine regional orientation that coexists with relatively strong local employment conditions. Graduates from higher-unemployment communities are more likely to pursue credentials outside the region — either at in-state institutions in stronger labor markets or out of state entirely — consistent with weaker local conditions pushing credential-seeking graduates toward more geographically distant opportunities.
+
+::: panel-tabset
+### `edr`
+
+```{r}
+tab_xtab(var.row = data$ps.pathway,
+         var.col = data$edr,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/High school characteristics/edr.html")
+
+```
+
+### `avg.unemp.rate`
+
+```{r}
+summary <- aov(avg.unemp.rate ~ ps.pathway, data = data)
+
+summary
+
+anova_df <- broom::tidy(summary)
+
+TukeyHSD(summary)
+
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/High school characteristics/avg-unemp-rate.xlsx", overwrite = TRUE)
+
+```
+:::
+
+<br>
+
+## High School Accomplishments
+
+Here are the variables we will explore.
+
+- `took.ACT`
+
+- `ACTCompositeScore`
+
+- `ap.exam`
+
+- `cte.achievement`
+
+- `total.cte.courses.taken`
+
+- `MCA.M`
+
+- `MCA.R`
+
+- `MCA.S`
+
+**HIGH SCHOOL ACCOMPLISHMENT VARIABLES AND POSTSECONDARY PATHWAY (Among credential completers only, n=47,959)**
+
+The accomplishment variables show their strongest and most differentiated associations with ps.pathway, which as the most complete postsecondary outcome variable reveals the full sorting mechanism operating from high school through credential completion.
+
+took.ACT is the strongest categorical predictor of ps.pathway (V=0.333). Non-ACT takers are concentrated in sub-baccalaureate regional (40.3%) and sub-baccalaureate MN (19.3%) completion, with very low bachelor or higher MN (8.4%) and bachelor or higher outside MN (10.8%) rates. ACT takers show the opposite profile — dominated by bachelor or higher outside MN (27.9%), bachelor or higher MN (23.7%), and bachelor or higher regional (23.0%), with low sub-baccalaureate regional (15.7%) and very low sub-baccalaureate MN (5.7%) rates. ACT participation is functioning as a near-perfect sorter between sub-baccalaureate and baccalaureate credential pathways across all geographic locations.
+
+ap.exam shows the second strongest association (V=0.322). AP exam takers are heavily concentrated in bachelor or higher outside MN (36.6%) and bachelor or higher MN (30.6%), with very low sub-baccalaureate regional (8.5%) and sub-baccalaureate MN (2.5%) rates. Non-AP takers show the reverse — sub-baccalaureate regional (24.8%) is their largest single pathway category, and bachelor or higher outside MN (19.8%) is their second largest. AP participation is the strongest predictor of the bachelor or higher MN pathway specifically (30.6% vs. 16.8%) — a finding with direct workforce implications given that bachelor or higher MN graduates show the highest meaningful MN employment rates at Years 5 and 10 in Stage 3.
+
+ACT Composite Score shows very large mean differences across pathways (F=1777.0). The ordering is clear and consistent: bachelor or higher outside MN and bachelor or higher MN score highest and are not significantly different from each other (difference=0.038, p=0.986). Bachelor or higher regional scores approximately 2.32 points below both. Sub-baccalaureate regional scores the lowest among single-state pathways, and sub-baccalaureate MN and sub-baccalaureate outside MN score approximately 0.45 and 0.26 points below sub-baccalaureate regional respectively — though sub-baccalaureate outside MN is not significantly different from sub-baccalaureate regional (p=0.240). The convergence of bachelor or higher MN and bachelor or higher outside MN at nearly identical ACT scores is analytically important — geographic destination after completing a four-year credential is not primarily driven by academic achievement but by other factors.
+
+MCA Math (F=968.4), MCA Reading (F=1087.8), and MCA Science (F=937.3) all show the same two-cluster structure at the pathway level. The bachelor or higher MN and bachelor or higher outside MN pathways are not significantly different from each other on any of the three assessments (Math p=0.439, Reading p=0.992, Science p=1.000). Sub-baccalaureate regional and sub-baccalaureate outside MN are not significantly different on Math (p=0.572) or Science (p=0.800), and only marginally different on Reading (p=0.791). This two-cluster structure — sub-baccalaureate pathways at lower scores, bachelor or higher pathways at higher scores — is the clearest expression of credential level as the primary sorting mechanism, with geographic location playing a secondary role within each credential level cluster.
+
+cte.achievement shows a strong association with ps.pathway (V=0.162). CTE concentrators are most concentrated in sub-baccalaureate regional (25.4%) completion — more than double the rate for No CTE graduates (12.3%) — and show the lowest bachelor or higher outside MN rate (20.1%) of any CTE category. No CTE graduates dominate bachelor or higher outside MN (31.9%) and bachelor or higher MN (27.5%). Bachelor or higher regional completion is essentially flat across CTE categories (20.4%, 23.2%, 20.6%), confirming that CTE engagement does not meaningfully influence whether a bachelor's graduate stays in the region — it operates primarily through the credential level and sub-baccalaureate regional sorting mechanism. The sub-baccalaureate outside MN and sub-baccalaureate MN gaps between concentrators and No CTE graduates (6.8% vs. 3.1% and 11.3% vs. 4.6%) suggest that even among sub-baccalaureate completers, CTE engagement is associated with more geographically proximate credential completion.
+
+Total CTE courses taken (F=834.9) confirms the dose-response pattern throughout. Sub-baccalaureate regional graduates take the most CTE courses, significantly above all other pathways. Sub-baccalaureate MN and sub-baccalaureate outside MN graduates also take substantially more courses than bachelor or higher graduates of any geographic type. Bachelor or higher MN and bachelor or higher outside MN graduates are not significantly different from each other (difference=0.161, p=0.001 — marginally significant but very small in practical terms), again confirming that geographic destination within the four-year pathway is not meaningfully driven by CTE engagement.
+
+The ps.pathway accomplishment findings are the most analytically complete picture of how high school experiences sort graduates into postsecondary pathways. The primary sorting mechanism is credential level — academic achievement predicts four-year completion while CTE engagement predicts sub-baccalaureate completion — and this sorting operates across all geographic destinations. The secondary sorting mechanism within credential level is geographic — for sub-baccalaureate completers, CTE engagement predicts regional completion; for four-year completers, academic achievement above the already-high threshold does not further differentiate geographic destination. These two mechanisms together produce the workforce pathway structure identified throughout the analysis.
+
+::: panel-tabset
+### `took.ACT`
+
+```{r}
+tab_xtab(var.row = data$ps.pathway,
+         var.col = data$took.ACT,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/High school accomplishments/took-ACT.html")
+```
+
+### `ACTCompositeScore`
+
+```{r}
+summary <- aov(ACTCompositeScore ~ ps.pathway, data = data)
+
+summary
+
+anova_df <- broom::tidy(summary)
+
+TukeyHSD(summary)
+
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/High school accomplishments/ACTCompositeScore.xlsx", overwrite = TRUE)
+```
+
+### `ap.exam`
+
+```{r}
+tab_xtab(var.row = data$ps.pathway,
+         var.col = data$ap.exam,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/High school accomplishments/ap-exam.html")
+```
+
+### `cte.achievement`
+
+```{r}
+tab_xtab(var.row = data$ps.pathway,
+         var.col = data$cte.achievement,
+         show.exp = TRUE,
+         show.col.prc = TRUE,
+         file = "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/High school accomplishments/cte-achievement.html")
+
+```
+
+### `total.cte.courses.taken`
+
+```{r}
+summary <- aov(total.cte.courses.taken ~ ps.pathway, data = data)
+
+summary
+
+anova_df <- broom::tidy(summary)
+
+TukeyHSD(summary)
+
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/High school accomplishments/total-cte-courses-taken.xlsx", overwrite = TRUE)
+```
+
+### `MCA.M`
+
+```{r}
+summary <- aov(MCA.M ~ ps.pathway, data = data)
+
+summary
+
+anova_df <- broom::tidy(summary)
+
+TukeyHSD(summary)
+
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/High school accomplishments/MCA-M.xlsx", overwrite = TRUE)
+```
+
+### `MCA.R`
+
+```{r}
+summary <- aov(MCA.R ~ ps.pathway, data = data)
+
+summary
+
+anova_df <- broom::tidy(summary)
+
+TukeyHSD(summary)
+
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/High school accomplishments/MCA-R.xlsx", overwrite = TRUE)
+
+```
+
+### `MCA.S`
+
+```{r}
+summary <- aov(MCA.S ~ ps.pathway, data = data)
+
+summary
+
+anova_df <- broom::tidy(summary)
+
+TukeyHSD(summary)
+
+tukey_df <- broom::tidy(TukeyHSD(summary))
+
+wb <- createWorkbook()
+addWorksheet(wb, "ANOVA")
+addWorksheet(wb, "TukeyHSD")
+writeData(wb, "ANOVA", anova_df)
+writeData(wb, "TukeyHSD", tukey_df)
+saveWorkbook(wb, "Data/Claude/analysis_post_secondary_pathways_ct/ps-pathway/High school accomplishments/MCA-S.xlsx", overwrite = TRUE)
+```
+:::
+
+<br>
+
+# POSTSECONDARY PATHWAY ANALYSIS — SUMMARY AND NARRATIVE Southeast Minnesota (EDR 9 and EDR 10)
+
+**OVERVIEW**
+
+The postsecondary analysis examined relationships between high school experiences and four postsecondary outcomes — credential completion (ps.grad), institution sector (ps.grad.InstitutionSector), graduation location (ps.grad.location), credential level (highest.cred.level), and the combined pathway variable (ps.pathway) — among 104,610 Southeast Minnesota high school graduates. The analysis was conducted in two stages: relationships with ps.grad were examined for the full population, and relationships with all other outcomes were examined among the 47,959 credential completers only. Across all dependent variables and all independent variable groups, two sorting mechanisms emerge with remarkable consistency. Academic achievement and orientation predict four-year credential completion and geographic departure from the region. CTE engagement predicts sub-baccalaureate credential completion and geographic proximity in both credential attainment and subsequent workforce attachment. These two mechanisms operate independently, in opposite directions, and are visible at every stage of the postsecondary pathway.
+
+**WHO COMPLETES A POSTSECONDARY CREDENTIAL**
+
+Forty-six percent of Southeast Minnesota graduates complete a postsecondary credential by 2023. The barriers to completion are concentrated among specific demographic groups and are strongly associated with high school academic orientation.
+
+Economic disadvantage is the most powerful demographic barrier — low-income graduates complete credentials at 26.2% compared to 55.1% for non-low-income graduates, a gap of nearly 29 percentage points. Special education status is equally consequential — only 14.4% of special education graduates complete credentials. These two variables represent the strongest demographic associations with credential completion in the analysis. Gender shows a meaningful gap favoring females (52.9% vs. 39.5% for males), and substantial racial and ethnic disparities exist — White (53.1%) and Asian/PI (51.8%) graduates complete at rates roughly double those of Black (28.9%), Hispanic (26.0%), and American Indian (14.6%) graduates. Higher local unemployment rates are modestly associated with higher completion rates, suggesting that weak local labor markets increase the relative attractiveness of postsecondary investment as an alternative to limited immediate employment opportunities.
+
+The high school accomplishment variables tell the most important part of the credential completion story. ACT participation is the single strongest predictor — non-ACT takers complete at just 19.4% compared to 59.7% for ACT takers. AP exam participation is nearly as powerful (74.9% vs. 38.4%). All three MCA assessments show large score gaps favoring completers. By contrast, CTE engagement is negatively associated with completion — CTE concentrators complete at 39.5% compared to 54.3% for No CTE graduates, and each additional CTE course taken is associated with lower completion likelihood. The academic orientation versus CTE engagement divide that defines the workforce pathway structure is already fully visible at the credential completion stage.
+
+**WHAT KIND OF CREDENTIAL AND FROM WHERE**
+
+Among the 47,959 graduates who complete credentials, the analysis reveals a second stage of sorting that is equally consequential for long-run workforce outcomes.
+
+Credential level splits 68.2% bachelor or higher versus 31.8% sub-baccalaureate. The same demographic and accomplishment variables that predict credential completion predict credential level within completers. Low-income completers hold sub-baccalaureate credentials at 49.2% — nearly double the rate for non-low-income completers (28.0%). Special education completers hold sub-baccalaureate credentials at 70.0%. Males complete sub-baccalaureate credentials at 35.9% compared to 28.6% for females. Hispanic (50.6%) and Black (40.8%) completers are more likely to hold sub-baccalaureate credentials than White (30.0%) and Asian/PI (23.0%) completers. ACT participation, AP exam participation, and high MCA scores all strongly predict bachelor or higher completion, while CTE concentration and higher total CTE course-taking strongly predict sub-baccalaureate completion. The dose-response relationship between total CTE courses taken and sub-baccalaureate completion is among the largest continuous variable associations in the entire analysis — sub-baccalaureate completers take on average 1.84 more CTE courses than bachelor or higher completers.
+
+Graduation location sorts completers into three geographic destinations — region (40.5%), outside Minnesota (30.3%), and elsewhere in Minnesota (29.1%). Gender is the striking non-finding here — it has essentially no association with graduation location (V=0.011, p=0.065). All other demographic variables show meaningful associations: low-income graduates complete regionally at 52.6% compared to 37.9% for non-low-income graduates, and special education completers complete regionally at 54.0% compared to 39.9%. These are access-constraint effects — economic and institutional barriers concentrate disadvantaged graduates at nearby regional institutions regardless of their credential level preferences. Among accomplishment variables, CTE engagement is the strongest predictor of regional graduation, while AP exam participation and high ACT scores predict out-of-state graduation. The geographic sorting that produces the workforce outcome differences seen in Stage 3 begins here, at the point of credential completion.
+
+EDR is the most interesting high school characteristics finding in this stage. EDR 10 graduates complete outside Minnesota at 32.7% compared to just 24.4% for EDR 9 graduates, while EDR 9 graduates complete sub-baccalaureate credentials within Minnesota at nearly double the EDR 10 rate (11.6% vs. 6.0%). This EDR difference in credential completion geography is the mechanism behind the workforce outcome divergence identified in Stage 3 — EDR 9 completers earn credentials in Minnesota and stay in Minnesota for employment, while EDR 10 completers are more likely to earn credentials out of state and leave entirely.
+
+**THE COMBINED PATHWAY PICTURE**
+
+The ps.pathway variable — crossing credential level with graduation location — produces the clearest and most analytically complete picture of how high school experiences sort graduates into long-run workforce trajectories. The six pathway categories sort graduates as follows: bachelor or higher outside MN (25.5%), bachelor or higher regional (21.3%), bachelor or higher MN (21.5%), sub-baccalaureate regional (19.2%), sub-baccalaureate MN (7.6%), and sub-baccalaureate outside MN (4.8%).
+
+The academic achievement variables show a two-cluster structure across ps.pathway that is consistent across all measures. Bachelor or higher MN and bachelor or higher outside MN graduates score at virtually identical levels on ACT composite, MCA Math, MCA Reading, and MCA Science — and are not significantly different from each other on any assessment. Sub-baccalaureate regional and sub-baccalaureate outside MN graduates similarly converge at lower score levels. This two-cluster structure means that academic achievement predicts credential level — the primary sorting decision — but does not meaningfully predict geographic destination within each credential level cluster. Whether a four-year graduate stays in Minnesota or leaves is not primarily a function of how academically accomplished they were in high school.
+
+CTE engagement shows the complementary pattern. Sub-baccalaureate regional graduates take the most CTE courses of any pathway group, and the sub-baccalaureate pathways as a whole take substantially more courses than the bachelor or higher pathways. Within the sub-baccalaureate cluster, CTE engagement predicts regional over out-of-state completion. Within the bachelor or higher cluster, CTE engagement shows only marginal differentiation between geographic destinations. CTE engagement is primarily a sub-baccalaureate and regional sorting mechanism — it channels graduates toward the credential type and geographic proximity most associated with regional workforce attachment.
+
+**THE STORY THE DATA TELLS**
+
+Three distinct postsecondary stories emerge from Southeast Minnesota's high school graduating cohorts.
+
+The first story is the college completer pathway in its two expressions. For graduates who complete four-year credentials, the critical variable is not academic achievement — which is high across all four-year completers — but geography. Those who complete regional four-year credentials are substantially more likely to achieve regional employment. Those who complete outside Minnesota — a group characterized by high AP exam participation and who come from relatively stronger local labor markets — are the most likely to establish careers entirely outside Minnesota's formal employment records. The bachelor or higher MN pathway represents an intermediate group who complete credentials in Minnesota but outside the region and subsequently show the strongest meaningful MN employment rates in Stage 3. For sub-baccalaureate completers, the story is cleaner — regional completion strongly predicts regional employment, and the strongest predictor of regional sub-baccalaureate completion is CTE engagement in high school.
+
+The second story is the workforce-first pathway. Graduates who do not complete credentials — more than half the population — enter the labor market directly from high school. Among these graduates, CTE engagement is the dominant predictor of regional workforce success, as established in Stage 3. The postsecondary analysis adds an important dimension to this story: the decision not to complete a credential is not random. It is concentrated among graduates with high CTE engagement, lower academic achievement, lower economic status, special education status, and certain racial and ethnic minority backgrounds. These graduates were systematically selected away from postsecondary completion by both their own orientations — CTE engagement reflects a deliberate choice toward workforce preparation — and by structural barriers including economic constraints and institutional access limitations.
+
+The third story is the disconnected pathway. Graduates who neither complete credentials nor achieve sustained employment are concentrated among those with low CTE engagement, low academic achievement, and high levels of economic disadvantage and special education status — the group that falls between both pathways rather than choosing one. The postsecondary analysis clarifies that this group is not simply defined by postsecondary non-completion. Many non-completers achieve sustained regional employment through the workforce-first pathway. The disconnected group is defined by the absence of both postsecondary engagement and CTE investment — graduates who neither developed vocational skills for regional employment nor academic skills for postsecondary success.
+
+**IMPLICATIONS FOR THE MULTIVARIATE STAGES**
+
+The postsecondary analysis provides strong and specific expectations for the multivariate confirmation stages. The ps.pathway combined variable should show the strongest and most differentiated associations with sustained regional employment at Year 5 — with sub-baccalaureate regional completion showing the highest odds among completers, followed by bachelor or higher regional, and with outside MN pathways showing the lowest odds. The CTE engagement variables should retain strong independent associations with regional employment among non-college completers even after controlling for demographic characteristics and high school characteristics. Economic disadvantage and special education status should show attenuated but persistent associations reflecting both direct barriers and their channeling effects through sub-baccalaureate credential pathways. The EDR effect should be modest but present, reflecting the geographic sorting of EDR 9 graduates toward in-state pathways and EDR 10 graduates toward out-of-state departure.
