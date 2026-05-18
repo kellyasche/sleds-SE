@@ -156,11 +156,11 @@ Here is a list of all the categorical variables with a description of each.
 <br>
 
 ```{r primary independent variables}
-qual.var.names <-  c("PersonID", "hs.grad.year", "Gender", "grad.year.covid", "LimitedEnglishProficiencyIndicator", "HomelessIndicator", "economic.status", "pseo.participant", "SpecialEdStatus", "non.english.home", "RaceEthnicity", "Dem_Desc", "edr", "took.ACT", "ap.exam", "cte.achievement", "english.learner", "sat.taken", "attended.ps.within.first.year.hsgrad", "attended.ps", "ps.grad", "ps.grad.InstitutionSector", "highest.cred.level", "ps.grad.location")
+qual.var.names <-  c("PersonID", "Gender", "LimitedEnglishProficiencyIndicator", "HomelessIndicator", "economic.status", "pseo.participant", "SpecialEdStatus", "non.english.home", "RaceEthnicity", "Dem_Desc", "edr", "took.ACT", "ap.exam", "cte.achievement", "english.learner", "sat.taken", "attended.ps.within.first.year.hsgrad", "attended.ps", "ps.grad", "ps.grad.InstitutionSector", "highest.cred.level", "ps.grad.location")
 
 quan.var.names <- c("total.cte.courses.taken", "cte.0", "cte.1", "cte.2", "cte.3", "cte.4", "cte.5", "cte.6", "cte.7", "cte.8", "cte.9", "cte.10", "cte.11", "cte.12", "cte.14", "cte.21", "cte.22", "cte.23", "cte.24", "cte.25", "cte.26", "avg.cte.intensity", "MCA.M", "MCA.R", "MCA.S", "avg.unemp.rate", "wages.3year.avg", "avg.wages.pct.state")
 
-independent.var.names <- c("hs.grad.year", "Gender", "LimitedEnglishProficiencyIndicator", "HomelessIndicator", "economic.status", "pseo.participant", "SpecialEdStatus", "non.english.home", "RaceEthnicity", "Dem_Desc", "edr", "took.ACT", "ap.exam", "total.cte.courses.taken", "cte.achievement", "avg.cte.intensity", "MCA.M", "MCA.R", "MCA.S", "sat.taken", "attended.ps", "ps.grad", "highest.cred.level", "ps.grad.location", "avg.unemp.rate", "wages.3year.avg")
+independent.var.names <- c("hs.grad.year", "Gender", "LimitedEnglishProficiencyIndicator", "non.english.home", "HomelessIndicator", "economic.status", "pseo.participant", "SpecialEdStatus", "non.english.home", "RaceEthnicity", "Dem_Desc", "edr", "took.ACT", "ap.exam", "total.cte.courses.taken", "cte.achievement", "avg.cte.intensity", "MCA.M", "MCA.R", "MCA.S", "sat.taken", "attended.ps", "ps.grad", "highest.cred.level", "ps.grad.location", "avg.unemp.rate", "wages.3year.avg")
 
 cte.cc.var.names <- c("cte.1", "cte.2", "cte.3", "cte.4", "cte.5", "cte.6", "cte.7", "cte.8", "cte.9", "cte.10", "cte.11", "cte.12", "cte.14", "cte.21", "cte.22", "cte.23", "cte.24", "cte.25")
 
@@ -172,104 +172,110 @@ ind.qual.var <- master.original %>%
 
 <br>
 
--   **Demographics**
-    -   *Grad year:* this is the year they graduated high school.
-    -   grad.year.covid: this is a value representing whether the individual graduated high school before 2020 or after 2021.
-        -   Pre-covid grad
-        -   Post-covid grad
-    -   *Gender:*
-        -   M = male
-        -   F = female
-    -   *RaceEthnicity:*
-        -   AI = American Indian
-        -   Asian/PI = Asian or Pacific Islander
-        -   Black = African American
-        -   Hispanic = any race any Hispanic or Latino
-        -   Unknown = unknown race or ethnicity
-        -   White = Caucasian and not Hispanic
+- **Demographics**
+  - *`Gender`:*
+    - M = male
+    - F = female
+  - *`RaceEthnicity`:*
+    - AI = American Indian
+    - Asian/PI = Asian or Pacific Islander
+    - Black = African American
+    - Hispanic = any race any Hispanic or Latino
+    - Unknown = unknown race or ethnicity
+    - White = Caucasian and not Hispanic
+  - *`LimitedEnglishProficiencyIndicator`:*
+    - Y = identified as having limited English proficiency at some point between 10th and 12th grade, otherwise N.
+  - *`HomelessIndicator`:*
+    - Y = the individual was identified as homeless at any point between 10th and 12th grade, otherwise N.
+  - *`economic.status`:*
+    - 1 = the individual was eligible for free or reduced lunch (codes 1,2,4,5) at any point between 10th and 12th grade, otherwise 0.
+  - *`SpecialEdStatus`:*
+    - 1 = the individual required special education services at some point between 10th and 12th grade, otherwise 0.
+  - *`non.english.home`:*
+    - 1 = the individual was identified as having English as not the primary language spoken at home between 10th and 12th grad, otherwise 0.
+  - *`english.learner`:*
+    - 1 = the individual was identified as an “English learner” at least one time between 10th and 12th grade, otherwise 0.
+- **High school characteristics**
+  - *`Dem_Desc`:* the RUCA category of the high school from which the individual graduated.
+  - `edr`: there are two EDR's in this region - EDR 9 and EDR 10.
+- **High school accomplishments**
+  - *`pseo.participant`:*
+    - 1 = the individual participated in a PSEO course sometime between 10th and 12th grade, otherwise 0. There are also NA values in this due to missing data.
+  - *`took.ACT:`* whether an individual took the ACT exam
+    - Yes
+    - No
+  - *`ap.exam`:*
+    - 1 = the individual took an AP exam at some point,
+    - 0 = the individual did not take an AP exam.
+  - *`cte.achievement`:* three indicators with
+    - “CTE concentrator or completor” = self-explanatory,
+    - “CTE participant” = they took a CTE course but was not a concentrator or completor, and,
+    - “No CTE” = they didn’t take a CTE course
+  - *`sat.taken`:*
+    - 1 = individual took the SAT at some point between 10th and 12th grade, otherwise 0.
+- **Post-secondary**
+  - *`attended.ps.within.first.year.hsgrad`:* the individual attended a post-secondary institution within the first year of graduating high school.
+    - Yes = Attended PS within first year
+    - No = Attended PS but not within first year
+    - NA = never attended PS or attended but only to withdraw.
+  - *`attended.ps`:*
+    - Yes = the individual attended a post-secondary education institution.
 
-<br>
+    - No = never attended post-secondary, or attended but only “W” or “D”.
+  - *`ps.grad`:*
+    - Yes = Graduated from a post-secondary institution by 2023
 
--   **High school characteristics**
-    -   *Dem_Desc:* the RUCA category of the high school from which the individual graduated.
-    -   *edr*: The EDR location of the high school from which they graduated.
+    - Attending ps = attending a post-secondary institution as of 2023
 
-<br>
+    - No = Not attending a post-secondary institution nor graduated from one as of 2023.
+  - *`ps.grad.InstitutionSector`:* the institution sector of the post-secondary school from which an individual has graduated.
+    - 1 - Public, 4-year or above
 
--   **High school enrollment**
-    -   *LimitedEnglishProficiencyIndicator:*
-        -   Y = identified as having limited English proficiency at some point between 10th and 12th grade, otherwise N.
-    -   *HomelessIndicator:*
-        -   Y = the individual was identified as homeless at any point between 10th and 12th grade, otherwise N.
-    -   *economic.status:*
-        -   1 = the individual was eligible for free or reduced lunch (codes 1,2,4,5) at any point between 10th and 12th grade, otherwise 0.
-    -   *pseo.participant:*
-        -   1 = the individual participated in a PSEO course sometime between 10th and 12th grade, otherwise 0. There are also NA values in this due to missing data.
-    -   *SpecialEdStatus:*
-        -   1 = the individual required special education services at some point between 10th and 12th grade, otherwise 0.
-    -   *non.english.home:*
-        -   1 = the individual was identified as having English as not the primary language spoken at home between 10th and 12th grad, otherwise 0.
-    -   *english.learner:*
-        -   1 = the individual was identified as an "English learner" at least one time between 10th and 12th grade, otherwise 0.
+    - 2 - Private not-for-profit, 4-year or above
 
-<br>
+    - 3 - Private for-profit, 4-year or above
 
--   **High school accomplishments**
-    -   *took.ACT:* whether an individual took the ACT exam
-        -   Yes
-        -   No
-    -   *ap.exam:*
-        -   1 = the individual took an AP exam at some point,
-        -   0 = the individual did not take an AP exam.
-    -   *cte.achievement:* three indicators with
-        -   "CTE concentrator or completor" = self-explanatory,
-        -   "CTE participant" = they took a CTE course but was not a concentrator or completor, and,
-        -   "No CTE" = they didn't take a CTE course
-    -   *sat.taken:*
-        -   1 = individual took the SAT at some point between 10th and 12th grade, otherwise 0.
+    - 4 - Public, 2-year
 
-<br>
+    - 5 - Private not-for-profit, 2-year
 
--   **Post-secondary**
-    -   *attended.ps.within.first.year.hsgrad:* the individual attended a post-secondary institution within the first year of graduating high school.
-        -   Yes = Attended PS within first year
-        -   No = Attended PS but not within first year
-        -   NA = never attended PS or attended but only to withdraw.
-    -   *attended.ps:*
-        -   Yes = the individual attended a post-secondary education institution.
-        -   No = never attended post-secondary, or attended but only "W" or "D".
-    -   *ps.grad:*
-        -   Yes = Graduated from a post-secondary institution by 2023
-        -   Attending ps = attending a post-secondary institution as of 2023
-        -   No = Not attending a post-secondary institution nor graduated from one as of 2023.
-    -   *ps.grad.InstitutionSector:* the institution sector of the post-secondary school from which an individual has graduated.
-        -   1 - Public, 4-year or above
-        -   2 - Private not-for-profit, 4-year or above
-        -   3 - Private for-profit, 4-year or above
-        -   4 - Public, 2-year
-        -   5 - Private not-for-profit, 2-year
-        -   6 - Private for-profit, 2-year
-        -   7 - Public, less-than 2-year
-        -   8 - Private not-for-profit, less-than 2-year
-        -   9 - Private for-profit, less-than 2-year
-        -   10 - multiple sectors (if attended multiple institutions)
-        -   99 - Sector unknown (not active)
-        -   "Never attended ps" = the individual never attended a post-secondary institution
-        -   "Did not grad" = the individual attended a post-secondary institution but did not graduate.
-    -   *highest.cred.level:* an identifier of the highest credential earned by the PersonID. The categories are;
-        -   Did not graduate ps
-        -   Attending ps
-        -   Less than associate degree
-        -   Associate degree
-        -   Bachelors degree
-        -   Higher than bachelors degree.
-    -   ps.grad.location: this is the following;
-        -   ps.grad.edr: graduated from a college in the same EDR as their high school
-        -   ps.grad.region: graduated from a college in the same region as their high school, but not same EDR
-        -   ps.grad.MN: graduated from a college in MN but not same region or EDR
-        -   ps.grad.outside: graduated from a college outside MN, but not in region or EDR or Minnesota
-        -   Did not grad: attended but did not graduate college or attended but did not graduate
-        -   Attending ps: Currently attending post-secondary at grad.year.x
+    - 6 - Private for-profit, 2-year
+
+    - 7 - Public, less-than 2-year
+
+    - 8 - Private not-for-profit, less-than 2-year
+
+    - 9 - Private for-profit, less-than 2-year
+
+    - 10 - multiple sectors (if attended multiple institutions)
+
+    - 99 - Sector unknown (not active)
+
+    - “Never attended ps” = the individual never attended a post-secondary institution
+
+    - “Did not grad” = the individual attended a post-secondary institution but did not graduate.
+  - *`highest.cred.level`:* an identifier of the highest credential earned by the PersonID. The categories are;
+    - Did not graduate ps
+
+    - Attending ps
+
+    - Less than associate degree
+
+    - Associate degree
+
+    - Bachelors degree
+
+    - Higher than bachelors degree.
+  - `ps.grad.location`: this is the following;
+    - ps.grad.region: graduated from a college in the Southeaset region.
+
+    - ps.grad.MN: graduated from a college in MN but not located in Southeast.
+
+    - ps.grad.outside: graduated from a college outside MN
+
+    - Did not grad: attended but did not graduate college or attended but did not graduate
+
+    - Attending ps: Currently attending post-secondary at grad.year.x
 
 <br>
 
@@ -277,12 +283,48 @@ ind.qual.var <- master.original %>%
 
 First, lets check to see there aren't any variable categories with very low frequencies which can distort the analysis.
 
-The tables below shows there are a few to be concerned about.
+**VARIABLES TO ELIMINATE OUTRIGHT**
 
--   *`HomelessIndicator`:* There are only .9% (1,136) individuals that indicated that they were homeless at one point between 10th and 12th grade.
--   *`ps.grad.InstitutionSector`:*
-    -   Categories 3,5,6,7,8,9 have less than 1% of graduates, each.
--   `ps.grad.location`: there were a little over a 1,000 that graduated from the same EDR as their high school, so I'm going to combine those with graduated from the same region.
+1.  `HomelessIndicator`:
+    - Only 0.9% of graduates (n=1,136) were ever identified as homeless.
+    - Too sparse for meaningful MCA contribution or stable bivariate estimates.
+    - Eliminate
+2.  `sat.taken`
+    - Only 1.8% of graduates (n=2,191) took the SAT.
+    - Far too rare to distinguish from noise. Not part of the core framework.
+    - Eliminate.
+
+**Variables to consolidate**
+
+- `ps.grad.InstitutionSector`: everal categories need collapsing before MCA
+  - Sectors 5, 6, 7, 8, 9 are effectively empty (n=7, 52, 3, 1, 60 respectively).
+  - Sector 3 (private for-profit 4-year) is marginal at n=939 (0.8%).
+  - NA has only n=3.
+  - The new categories will be the following;
+    - 1 - Public, 4-year or above
+    - 2 - Private not-for-profit, 4-year or above
+    - 4 - Public, 2-year
+    - 10 - multiple sectors (if attended multiple institutions)
+    - 11 - Other type of college
+      - 3 - Private for-profit, 4-year or above
+      - 5 - Private not-for-profit, 2-year
+      - 6 - Private for-profit, 2-year
+      - 7 - Public, less-than 2-year
+      - 8 - Private not-for-profit, less-than 2-year
+      - 9 - Private for-profit, less-than 2-year
+      - 99 - Sector unknown (not active)
+    - “Never attended ps” = the individual never attended a post-secondary institution
+    - “Did not grad” = the individual attended a post-secondary institution but did not graduate.
+- `ps.grad.location` — "PS grad EDR" category is very small and I will consolidate those so they just read "PS grad region"
+- `highest.cred.level`: I will collapse some of these categories and have the following;
+  - Did not graduate ps
+  - Less than a bachelor's
+  - Bachelor's or higher
+
+**VARIABLES TO WATCH BUT KEEP**
+
+- `RaceEthnicity/AI`: n=642 (0.5%). Small but present in the framework; retain for bivariate stages with appropriate caution in interpretation. May be unstable in multivariate models.
+- `LimitedEnglishProficiencyIndicator`: n=2,625 (2.1%) identified as Y. Small but not negligible. Keep for now; its relationship to english.learner (8.9%) and non.english.home (8.8%) will be assessed in the MCA.
 
 <br>
 
@@ -294,7 +336,8 @@ ind.qual.freq <- ind.qual.var %>%
   ungroup() %>%
   mutate(pct = n / nrow(master.original),
          pct = percent(pct, accuracy = .1)) %>%
-  mutate(data_id = seq(n()))
+  mutate(data_id = seq(n())) %>%
+  write_csv(., "Data/Claude/analysis_mca/variable-frequencies.csv")
 
 ind.qual.freq.plot <- ggplot(ind.qual.freq, aes(value, n)) +
   facet_wrap(~key, ncol = 4, scales = "free") +
@@ -317,31 +360,15 @@ girafe(ggobj = ind.qual.freq.plot, width_svg = 10, height_svg = 20) %>%
 
 <br>
 
-Due to these low frequencies, I'm going to do the following;
-
--   *`HomelessIndicator`*: eliminate from analysis
-
--   `ps.grad.InstitutionSector`: combine categories 3, 5, 6, 7, 8 and 9 into one category. This means that the following institution sectors will be relabeled as "11";
-
-    -   3 - Private for-profit, 4-year or above
-    -   5 - Private, not-for-profit 2-year
-    -   6 - Private for-profit, 2-year
-    -   7 - Public, less than 2-year
-    -   8 - Private not-for-profit less than 2-year
-    -   9 - Private for-profit, less-than 2-year
-
--   ps.grad.location
-
-    -   "PS grad region" = individual graduated from the EDR or region as their high school.
-
-<br>
-
 ```{r updated ind qual var}
 master.ind.qual.var <- ind.qual.var %>%
-  select(-PersonID, -HomelessIndicator) %>%
+  select(-PersonID, -HomelessIndicator, -sat.taken) %>%
   mutate(ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector %in% c("3", "5", "6", "7", "8", "9"), "11", as.character(ps.grad.InstitutionSector)),
-         ps.grad.location = ifelse(ps.grad.location %in% c("PS grad region", "PS grad EDR"), "PS grad region", as.character(ps.grad.location)))
-
+         ps.grad.location = ifelse(ps.grad.location %in% c("PS grad region", "PS grad EDR"), "PS grad region", as.character(ps.grad.location)),
+         ps.grad.location = as.factor(ps.grad.location),
+         highest.cred.level = ifelse(highest.cred.level %in% c("Associate degree", "Less than Associate Degree"), "Less than Bachelors",
+                                     ifelse(highest.cred.level %in% c("Bachelor degree", "Master degree or higher"), "Bachelors or higher", as.character(highest.cred.level))),
+         highest.cred.level = as.factor(highest.cred.level))
 ```
 
 <br>
@@ -352,30 +379,30 @@ For the MCA analysis, I'm going to group these variables together to make sure t
 
 Here are the groupings I'm going to use;
 
--   Demographics
-    -   `Gender`
-    -   `grad.year.covid`
-    -   `LimitedEnglishProficiency`
-    -   `economic.status`
-    -   `SpecialEdStatus`
-    -   `non.english.home`
-    -   `RaceEthnicity`
-    -   `english.learner`
--   High school characteristics
-    -   `Dem_Desc`
-    -   `EDR`
--   High school accomplishments
-    -   `pseo.participant`
-    -   `took.ACT`
-    -   `ap.exam`
-    -   `cte.achievement`
--   Post-secondary
-    -   `attended.ps.within.first.year.hsgrad`
-    -   `attended.ps`
-    -   `ps.grad`
-    -   `ps.grad.InstitutionSector`
-    -   `highest.cred.level`
-    -   `ps.grad.location`
+- Demographics
+  - `Gender`
+  - `LimitedEnglishProficiency`
+  - `economic.status`
+  - `SpecialEdStatus`
+  - `non.english.home`
+  - `RaceEthnicity`
+  - `english.learner`
+  - `non.english.home`
+- High school characteristics
+  - `Dem_Desc`
+  - `EDR`
+- High school accomplishments
+  - `pseo.participant`
+  - `took.ACT`
+  - `ap.exam`
+  - `cte.achievement`
+- Post-secondary
+  - `attended.ps.within.first.year.hsgrad`
+  - `attended.ps`
+  - `ps.grad`
+  - `ps.grad.InstitutionSector`
+  - `highest.cred.level`
+  - `ps.grad.location`
 
 <br>
 
@@ -383,19 +410,19 @@ Here are the groupings I'm going to use;
 
 Below are the variables that are categorized as "demographics".
 
--   Demographics
-    -   `Gender`
-    -   `grad.year.covid`
-    -   `LimitedEnglishProficiency`
-    -   `economic.status`
-    -   `SpecialEdStatus`
-    -   `non.english.home`
-    -   `RaceEthnicity`
-    -   `english.learner`
+- Demographics
+  - `Gender`
+  - `LimitedEnglishProficiency`
+  - `economic.status`
+  - `SpecialEdStatus`
+  - `non.english.home`
+  - `RaceEthnicity`
+  - `english.learner`
+  - `non.english.home`
 
 ```{r demographics prep, echo=TRUE}
 demographics <- master.ind.qual.var %>%
-  select(Gender, grad.year.covid, LimitedEnglishProficiencyIndicator, economic.status, SpecialEdStatus, non.english.home, RaceEthnicity, english.learner) %>%
+  select(Gender, LimitedEnglishProficiencyIndicator, economic.status, SpecialEdStatus, non.english.home, RaceEthnicity, english.learner, non.english.home) %>%
   filter(RaceEthnicity != "Unknown")
 
 kable(head(demographics))
@@ -415,7 +442,7 @@ As expected, we have `r comma(nrow(demographics))` individuals in the dataset.
 
 The eigenvalues measure the amount of variation retained by each principle component. This will help us determine how many principle components to be considered.
 
-The values below indicate that the first dimension explains nearly 25% of the variation. It takes 7 dimensions to explain 75%. This means the dataset is complex and variable redundancy may be low.
+Dimension 1 explains 27.4% of variance. It takes 5 dimensions to reach 70% and 7 to reach 85%. No single dominant structure — demographic variables are capturing several independent axes of variation. No redundancy concerns.
 
 <br>
 
@@ -433,48 +460,24 @@ eig.val
 
 #### COS^2^
 
-Let's take a look to see which variables are going to be important. The chart and table below show the cos2 value for each of the four dimensions.
-
--   Sum of cos2 for all dimensions
-    -   Good representation (above .5)
-        -   non.english.home
-        -   RaceEthnicity - Black, White, AI, Asian
-        -   english.learner
-        -   SpecialEdStatus
-        -   Gender
-        -   EconomicStatus
-        -   Covid grad
-    -   Moderate representation (between .2 and .5)
-        -   `LimitedEnglishProficiencyIndicator`
-        -   `Gender`
-        -   `Economic Status`
-        -   `RaceEthnicity - Hispanic`
-    -   Below .2
-        -   None
-
-**Dimension 1:** Language barriers, economic status, white
-
-**Dimension 2:** Special education needs
-
-**Dimension 3:** American Indian & Covid graduate
-
-**Dimension 4:** Gender, Black, and Asian
-
-I see no variables that would be good to eliminate here.
+All variables show total cos² above 0.43, most above 0.65. Solid representation across five dimensions. Nothing to eliminate.
 
 \<br\>
 
 ```{r demogrpahics mca correlation between variables}
 table <- demographics.mca$var$cos2 %>%
   as.data.frame() %>%
-  select(`Dim 1`, `Dim 2`, `Dim 3`, `Dim 4`) %>%
-  mutate(total = `Dim 1` + `Dim 2` + `Dim 3` + `Dim 4`) 
+  select(`Dim 1`, `Dim 2`, `Dim 3`, `Dim 4`, `Dim 5`) %>%
+  mutate(total = `Dim 1` + `Dim 2` + `Dim 3` + `Dim 4` + `Dim 5`) %>%
+  write_csv(., "Data/Claude/analysis_mca/Demographics/cos2.csv")
+
+
   
 datatable(table) %>%
   formatCurrency(1:5, "", digits = 3)
 
 
-fviz_cos2(demographics.mca, choice = "var", axes = 1:4)
+fviz_cos2(demographics.mca, choice = "var", axes = 1:5)
 
 ```
 
@@ -482,14 +485,17 @@ fviz_cos2(demographics.mca, choice = "var", axes = 1:4)
 
 #### Contribution to dimensions
 
-Next, lets see how much each variable is contributing to each dimension. There are 19 categories, so that means a percentage that is above 5.26% indicates a strong contribution to the dimension.
+Dimension 1: Driven by non.english.home/english.learner and economic.status — a language/poverty axis.
 
-Here are labels that seem to explain each dimension;
+Dimension 2: Dominated by SpecialEdStatus — stands largely alone.
 
-1.  Language barriers and ethnicity (black and Hispanic) and relationship to poverty
-2.  Special Education, Asian, American Indian, Gender
-3.  American Indian, post-covid grad, Gender
-4.  Black, Asian, Hispanic and Gender
+Dimension 3: RaceEthnicity (Hispanic, Black) and LimitedEnglishProficiencyIndicator.
+
+Dimension 4: RaceEthnicity (White, AI) and Gender.
+
+Dimension 5: RaceEthnicity (AI) and Hispanic — capturing remaining minority group variation.
+
+No variable contributes nothing across all five dimensions. No eliminations warranted.
 
 <br>
 
@@ -497,14 +503,16 @@ Here are labels that seem to explain each dimension;
 table <- demographics.mca$var$contrib %>%
   as.data.frame() %>%
   mutate(id = seq(n())) %>%
-  select(id, `Dim 1`, `Dim 2`, `Dim 3`, `Dim 4`) %>%
+  select(id, `Dim 1`, `Dim 2`, `Dim 3`, `Dim 4`, `Dim 5`) %>%
   mutate(`Dim 1` = `Dim 1` / 100,
          `Dim 2` = `Dim 2` / 100,
          `Dim 3` = `Dim 3` / 100,
-         `Dim 4` = `Dim 4` / 100)
+         `Dim 4` = `Dim 4` / 100,
+         `Dim 5` = `Dim 5` / 100) %>%
+  write_csv(., "Data/Claude/analysis_mca/Demographics/contribution-to-dimensions.csv")
 
 datatable(table) %>%
-  formatPercentage(2:5, digits = 1)
+  formatPercentage(2:6, digits = 1)
   
 
 ```
@@ -513,7 +521,7 @@ datatable(table) %>%
 
 For demographics we will keep all variables.
 
--   Eliminate - none
+- Eliminate - none
 
 <br>
 
@@ -521,9 +529,9 @@ For demographics we will keep all variables.
 
 Below are the variables that are categorized as "high school characteristics".
 
--   High school characteristics
-    -   `Dem_Desc`
-    -   `EDR`
+- High school characteristics
+  - `Dem_Desc`
+  - `EDR`
 
 ```{r hs characteristics prep, echo=TRUE}
 hs.char <- master.ind.qual.var %>%
@@ -546,7 +554,7 @@ We have `r comma(nrow(demographics))` individuals in the dataset.
 
 The eigenvalues measure the amount of variation retained by each principle component. This will help us determine how many principle components to be considered.
 
-The values below indicate that the first two dimensions explain 72% of the variance. Examining the cos2 values for each dimension might allow us to eliminate one of these variables.
+Three dimensions exhaust the variance, which is expected given there are only two variables (Dem_Desc and edr). Dimension 1 explains 39% and the first two dimensions together explain 73%. Simple structure — no redundancy concerns.
 
 <br>
 
@@ -574,7 +582,8 @@ Let's take a look to see which variables are going to be important. The chart an
 table <- hs.char.mca$var$cos2 %>%
   as.data.frame() %>%
   select(`Dim 1`, `Dim 2`, `Dim 3`) %>%
-  mutate(total = `Dim 1` + `Dim 2` + `Dim 3`)
+  mutate(total = `Dim 1` + `Dim 2` + `Dim 3`) %>%
+  write_csv("Data/Claude/analysis_mca/High school characteristics/cos2.csv")
   
 datatable(table) %>%
   formatCurrency(1:3, digits = 3, "")
@@ -588,11 +597,7 @@ fviz_cos2(hs.char.mca, choice = "var", axes = 1:2)
 
 #### Contribution to dimensions
 
-Next, lets see how much each variable is contributing to each dimension. There are 5 categories so any percent above 20% would be quite influential.Here are the labels for each dimension;
-
-1.  More rural
-2.  More urban
-3.  Same as 1
+Dim_Desc drives Dimension 2 (entirely urban category dominant). EDR drives Dimensions 1 and 3. The two variables are capturing distinct geographic axes — urban/rural character versus EDR membership. No redundancy, no eliminations warranted.
 
 <br>
 
@@ -602,7 +607,8 @@ table <- hs.char.mca$var$contrib %>%
   select(`Dim 1`, `Dim 2`, `Dim 3`) %>%
   mutate(`Dim 1` = `Dim 1` / 100,
          `Dim 2` = `Dim 2` / 100,
-         `Dim 3` = `Dim 3` / 100)
+         `Dim 3` = `Dim 3` / 100) %>%
+  write_csv(., "Data/Claude/analysis_mca/High school characteristics/contribution-to-dimensions.csv")
 
 datatable(table) %>%
   formatPercentage(1:3, digits = 1)
@@ -612,7 +618,7 @@ datatable(table) %>%
 
 So regarding any variables to eliminate in the dataset, I don't see one. It looks important to keep them all.
 
--   Eliminate: none
+- Eliminate: none
 
 <br>
 
@@ -620,11 +626,11 @@ So regarding any variables to eliminate in the dataset, I don't see one. It look
 
 Below are the variables that are categorized as "high school accomplishments".
 
--   High school accomplishments
-    -   `pseo.participant`
-    -   `took.ACT`
-    -   `ap.exam`
-    -   `cte.achievement`
+- High school accomplishments
+  - `pseo.participant`
+  - `took.ACT`
+  - `ap.exam`
+  - `cte.achievement`
 
 ```{r high school accomplishments prep, echo=TRUE}
 hs.accomplishments <- master.ind.qual.var %>%
@@ -645,9 +651,7 @@ There are `r comma(nrow(demographics))` individuals in the dataset.
 
 #### Eigenvalues
 
-The eigenvalues measure the amount of variation retained by each principle component. This will help us determine how many principle components to be considered.
-
-The values below indicate that the first dimension explains nearly 24% of the variation. It takes 4 dimensions to explain over 75%.
+Dimension 1 explains 25.5% of variance. It takes 4 dimensions to reach 75% and all 6 to exhaust the variance. Moderate complexity — no single dominant structure. Consistent with a group of variables capturing distinct aspects of academic engagement. No redundancy concerns at this stage.
 
 ```{r high school accomplishments eigenvalues}
 hs.accomplishments.mca <- FactoMineR::MCA(hs.accomplishments, graph = FALSE)
@@ -661,59 +665,59 @@ eig.val
 
 #### COS^2^
 
-Let's take a look to see which variables are going to be important. The total cos^2^ shows that all of the variables contribute to the overall dimensional structure of the dataset. The lowest being the ap.exams.
-
-**Dimension 1:** Whether an individual took the ACT and ap exams, and participated in PSEO.
-
-**Dimension 2:** Engaged in CTE and did not participate in pseo
-
-**Dimension 3:** Was not engaged in CTE or PSEO
-
-**Dimension 4:** Engaged in CTE
+All variables show total cos² above 0.52, most above 0.63. Solid representation across four dimensions. The one relatively lower value (took.ACT No at 0.526) is still acceptable. No eliminations warranted.
 
 ```{r high school accomplishments mca correlation between variables}
 table <- hs.accomplishments.mca$var$cos2 %>%
   as.data.frame() %>%
-  select(`Dim 1`, `Dim 2`, `Dim 3`, `Dim 4`) %>%
-  mutate(total = `Dim 1` + `Dim 2` + `Dim 3` + `Dim 4`)
+  rownames_to_column("variable") %>%
+  mutate(total = `Dim 1` + `Dim 2` + `Dim 3` + `Dim 4` + `Dim 5`) %>%
+  write_csv(., "Data/Claude/analysis_mca/High school accomplishments/cos2.csv")
   
 datatable(table) %>%
   formatCurrency(1:5, "", digits = 3)
 
-fviz_cos2(hs.accomplishments.mca, choice = "var", axes = 1:4)
+fviz_cos2(hs.accomplishments.mca, choice = "var", axes = 1:5)
 ```
 
 <br>
 
 #### Contribution to dimensions
 
-Next, lets see how much each variable is contributing to each dimension. There are 10 categories so any percent above 10% would be quite influential. Each variable does have a value above 10% for at least one of the dimensions.
+Dimension 1: Driven by took.ACT (No and Yes) — academic testing axis.
 
-1.  Took the AP exam and ACT and participated in PSEO
-2.  Relationship between CTE and PSEO
-3.  Less engagement with CTE
-4.  Highly engaged in CTE
+Dimension 2: Driven by pseo.participant NA and CTE Participant — separating non-PSEO-eligible cohorts from moderate CTE engagement.
+
+Dimension 3: Dominated by No CTE — absence of CTE engagement stands apart.
+
+Dimension 4: CTE Participant and pseo.participant NA — further separating CTE engagement levels.
+
+Dimension 5: pseo.participant_1 and ap.exam_1 — advanced academic participation axis.
+
+No eliminations warranted among retained variables.
 
 <br>
 
 ```{r hs accomplishments mca contribution}
 table <- hs.accomplishments.mca$var$contrib %>%
   as.data.frame() %>%
-  select(`Dim 1`, `Dim 2`, `Dim 3`, `Dim 4`) %>%
+  rownames_to_column("variable") %>%
   mutate(`Dim 1` = `Dim 1` / 100,
          `Dim 2` = `Dim 2` / 100,
          `Dim 3` = `Dim 3` / 100,
-         `Dim 4` = `Dim 4` / 100)
+         `Dim 4` = `Dim 4` / 100,
+         `Dim 5` = `Dim 5` / 100) %>%
+  write_csv(., "Data/Claude/analysis_mca/High school accomplishments/contribution-to-dimensions.csv")
 
 datatable(table) %>%
-  formatPercentage(1:4, digits = 1)
+  formatPercentage(2:6, digits = 1)
 ```
 
 <br>
 
 So regarding any variables to eliminate in the dataset, I don't see one. It looks important to keep them all.
 
--   Eliminate: none
+- Eliminate: none
 
 <br>
 
@@ -721,12 +725,13 @@ So regarding any variables to eliminate in the dataset, I don't see one. It look
 
 Below are the variables that are categorized as "high school accomplishments".
 
--   `attended.ps.within.first.year.hsgrad`
--   `attended.ps`
--   `ps.grad`
--   `ps.grad.InstitutionSector`
--   `highest.cred.level`
--   `ps.grad.location`
+- Post-secondary
+  - `attended.ps.within.first.year.hsgrad`
+  - `attended.ps`
+  - `ps.grad`
+  - `ps.grad.InstitutionSector`
+  - `highest.cred.level`
+  - `ps.grad.location`
 
 ```{r ps prep, echo=TRUE}
 ps <- master.ind.qual.var %>%
@@ -751,7 +756,7 @@ There are `r comma(nrow(demographics))` individuals in the dataset.
 
 The eigenvalues measure the amount of variation retained by each principle component. This will help us determine how many principle components to be considered.
 
-The first two dimensions explain 40% of the variation but it takes up to 7 dimensions to surpass 75%.
+Dimension 1 explains 24.8% of variance. It takes 5 dimensions to reach 72% and 8 to reach 88%. Dimensions 15-21 are effectively zero — these are artifacts of category redundancy among the postsecondary variables, which is expected given the structural overlap between attended.ps, ps.grad, highest.cred.level, and ps.grad.location. Complex but not surprising for this variable group. No concerns at this stage.
 
 <br>
 
@@ -769,37 +774,32 @@ eig.val
 
 Let's take a look to see which variables are going to be important. From the total cos^2^ we can see that there are a few that just aren't make the cut (below .2);
 
--   Graduated from any of the following post-secondary institutions;
-    -   `ps.grad.InstitutionSector`
-        -   private not-for-profit, 4-year or above "2"
-        -   graduated from multiple sectors "10"
-        -   graduated from any of the "11"
-        -   "Did not grad"
-    -   `highest.cred.level`
-        -   Master degree or higher
-    -   `attended.ps.within.first.year.hsgrad`
-        -   No
-    -   had "NA".
+Several categories show notably low total cos² across five dimensions and warrant attention:
 
-The type of institution an individual graduated from variable is a good candidate for collapsing into fewer categories as well as the highest credential earned variable. And I think the `attended.ps.within.first.year.hsgrad` variable might be a good option for elimination.
+ps.grad.InstitutionSector_10 (total = 0.071) and ps.grad.InstitutionSector_11 (total = 0.024) are poorly represented — the collapsed "other" category and "multiple sectors" are not well captured by the MCA dimensions. This is partly a consequence of their heterogeneity.
 
--   **Dimension 1:** Whether they attended and/or graduated from a post-secondary institution.
--   **Dimension 2:** Currently attending post-secondary
--   **Dimension 3:** Graduated from a public 2-year or 4-year institution and received corresponding credential
--   **Dimension 4:** Did not graduate from a post-secondary institution
+ps.grad.InstitutionSector_2 (total = 0.173) is also weak.
+
+ps.grad.location categories — PS grad MN (0.210), PS grad outside MN (0.337), and PS grad region (0.467) — are all moderate to low, suggesting graduation location is not strongly structured relative to the other postsecondary variables.
+
+attended.ps.within.first.year.hsgrad_No (total = 0.160) is very poorly represented.
+
+Everything else is well represented (total \> 0.77). The weak representation of several ps.grad.InstitutionSector categories and attended.ps.within.first.year.hsgrad_No suggests these variables may not be contributing meaningfully to the MCA structure. Worth flagging before reviewing contributions.
 
 <br>
 
 ```{r ps mca correlation between variables}
 table <- ps.mca$var$cos2 %>%
   as.data.frame() %>%
-  select(`Dim 1`, `Dim 2`, `Dim 3`, `Dim 4`) %>%
-  mutate(total = `Dim 1` + `Dim 2` + `Dim 3` + `Dim 4`)
+  rownames_to_column("variable") %>%
+  mutate(total = `Dim 1` + `Dim 2` + `Dim 3` + `Dim 4` + `Dim 5`)  %>%
+  write_csv(., "Data/Claude/analysis_mca/Post secondary/cos2.csv")
+
   
 datatable(table) %>%
-  formatCurrency(1:5, "", digits = 3)
+  formatCurrency(1:6, "", digits = 3)
 
-fviz_cos2(ps.mca, choice = "var", axes = 1:4)
+fviz_cos2(ps.mca, choice = "var", axes = 1:5)
 ```
 
 <br>
@@ -808,102 +808,84 @@ fviz_cos2(ps.mca, choice = "var", axes = 1:4)
 
 Next, lets see how much each variable is contributing to each dimension. There are 29 categories so any percent above 3.4% would be quite influential. There are a few categories that don't reach that threshold for any of the four dimensions.
 
--   `ps.grad.location`
-    -   PS grad MN
--   `ps.grad.InstitutionSector`
-    -   2
-    -   Did not grad
-    -   10
-    -   11
--   `highest.cred.level`
-    -   Master degree or higher
--   `attended.ps.within.first.year.hsgrad`
-    -   No
-
-Here are the labels for each dimension.
-
-1.  Did not attend post secondary or graduate.
-2.  Currently attending post-secondary
-3.  Attended a public 2-year or 4-year and received corresponding credential.
-4.  NA
+- 
 
 <br>
 
 ```{r ps mca contribution}
 table <- ps.mca$var$contrib %>%
   as.data.frame() %>%
-  select(`Dim 1`, `Dim 2`, `Dim 3`, `Dim 4`) %>%
+  rownames_to_column("variable") %>%
   mutate(`Dim 1` = `Dim 1` / 100,
          `Dim 2` = `Dim 2` / 100,
          `Dim 3` = `Dim 3` / 100,
-         `Dim 4` = `Dim 4` / 100)
+         `Dim 4` = `Dim 4` / 100,
+         `Dim 5` = `Dim 5` / 100) %>%
+  write_csv(., "Data/Claude/analysis_mca/Post secondary/contributions-to-dimensions.csv")
 
 datatable(table) %>%
-  formatPercentage(1:4, digits = 1)
+  formatPercentage(2:6, digits = 1)
 ```
 
 <br>
 
-I'm seeing room for improvement among these variables. I will do the following;
+Dimension 1: Driven by attended.ps/attended.ps_No and ps.grad_No — a non-participation axis.
 
-1.  `ps.grad.InstitutionSector`: collapse categories 2, 10, 11 and NA into one category.
-2.  `highest.cred.level`: collapse Master's degree or higher and Bachelor's degree into one category.
-3.  When conducting analysis, make sure to eliminate "attending ps" individuals as it will muddy the waters.
-4.  Eliminate `attended.ps.within.first.year.hsgrad`
+Dimension 2: Dominated by ps.grad_Attending ps, highest.cred.level_Attending ps, ps.grad.location_Attending ps, and ps.grad.InstitutionSector_Attending ps — a current enrollment axis. These four categories are essentially the same construct appearing across multiple variables, confirming the expected redundancy.
+
+Dimension 3: Driven by ps.grad.InstitutionSector_4 (public 2-year), highest.cred.level_Less than Bachelors, and highest.cred.level_Bachelors or higher — a credential level and institution type axis.
+
+Dimension 4: Dominated entirely by ps.grad.InstitutionSector.NA and ps.grad.location.NA — an artifact of missing data, not a meaningful substantive dimension.
+
+Dimension 5: Dominated by ps.grad.InstitutionSector_Did not grad — non-completion axis.
+
+The redundancy across attended.ps, ps.grad, highest.cred.level, ps.grad.location, and ps.grad.InstitutionSector is clearly visible. These variables are structurally overlapping as expected. No eliminations needed for the MCA itself, but this confirms they should not all enter multivariate models simultaneously.
 
 <br>
 
-# Variables to keep and eliminate
+# SUMMARY AND RECOMMENDATIONS
 
-The analysis above shows that the following variables would likely provide high quality representation without muddying up the analysis with so many variables.
+**VARIABLES ELIMINATED PRIOR TO MCA**
 
-*Demographics*
+Two variables were eliminated based on frequency review before the MCA was conducted. `HomelessIndicator` was dropped due to extremely low prevalence (0.9%), and `sat.taken` was dropped due to both low prevalence (1.8%) and its absence from the core analytical framework.
 
--   Eliminate:
-    -   HomelessIndicator
--   Modify
-    -   None
+**DEMOGRAPHIC VARIABLES**
 
-*High school characteristics*
+The demographic MCA produced ten dimensions, with Dimension 1 explaining 27.4% of variance. No single dominant structure emerged, indicating that demographic variables capture several relatively independent axes of variation. Dimension 1 reflected a language/poverty axis driven by `non.english.home`, `english.learner`, and `economic.status`. Dimension 2 was dominated by `SpecialEdStatus`. Dimensions 3 and 4 captured racial/ethnic variation. Notably, the three language-related variables — `english.learner`, `non.english.home`, and `LimitedEnglishProficiencyIndicator` — loaded on different dimensions despite their conceptual overlap, suggesting they capture meaningfully distinct subpopulations. All demographic variables showed adequate cos² representation. No eliminations are warranted.
 
--   Eliminate:
-    -   None
--   Modify
-    -   None
+Recommendation: Retain all demographic variables. Consistent with the established framework, `non.english.home` will be excluded from multivariate models due to redundancy with `english.learner`, but retained for bivariate stages.
 
-*High school accomplishments:*
+**HIGH SCHOOL CHARACTERISTICS**
 
--   Eliminate
-    -   None
--   Modify
-    -   None
+With only two variables (`Dem_Desc` and `edr`), three dimensions exhausted all variance. `Dem_Desc` drove Dimension 2, reflecting urban/rural character, while `edr` drove Dimensions 1 and 3, reflecting EDR membership. The two variables capture distinct geographic axes with no redundancy. Recommendation: Retain both variables.
 
-*Post secondary*
+**HIGH SCHOOL ACCOMPLISHMENTS**
 
--   Eliminate
-    -   `ps.within.first.year.hsgrad`
--   Modify
-    -   `ps.grad.InstitutionSector`: collapse the following categories into one labeled as "11"
-        -   2 - private, not-for-profit, 4-year or above
-        -   3 - Private for-profit, 4-year or above
-        -   5 - Private, not-for-profit 2-year
-        -   6 - Private for-profit, 2-year
-        -   7 - Public, less than 2-year
-        -   8 - Private not-for-profit less than 2-year
-        -   9 - Private for-profit, less-than 2-year
-        -   10 - multiple sectors
-        -   NA
-    -   highest.cred.level: collapse the following into one labeled as "Bachelor degree or higher"
-        -   Bachelor degree
-        -   Master degree or higher
+Dimension 1 explained 25.5% of variance across six dimensions. `took.ACT` anchored Dimension 1 as a general academic testing axis. `ap.exam` and `pseo.participant` defined an advanced academic coursework axis across Dimensions 2 and 5. `cte.achievement` dominated Dimensions 3 and 4, with the absence of CTE engagement (No CTE) standing particularly apart. All variables showed adequate cos² representation.
+
+Recommendation: Retain all variables.
+
+**POSTSECONDARY VARIABLES**
+
+The postsecondary MCA revealed the expected structural redundancy across `attended.ps`, `ps.grad`, `highest.cred.level`, `ps.grad.location`, and `ps.grad.InstitutionSector` — these variables are overlapping by construction. Dimension 1 captured non-participation, Dimension 2 captured current enrollment (appearing identically across four variables), Dimension 3 captured credential level and institution type, and Dimension 4 was an artifact of missing data rather than a substantive structure. Several `ps.grad.InstitutionSector` categories showed weak cos² representation, particularly the collapsed other category (11, total = 0.024) and multiple sectors (10, total = 0.071). `ps.grad.location` graduation destination categories were also moderately weak.
+
+Recommendation: Retain all postsecondary variables for bivariate stages. The confirmed redundancy reinforces the framework decision to consolidate these variables into the ps.pathway combined variable for multivariate modeling rather than entering them simultaneously. The weak representation of `ps.grad.InstitutionSector` collapsed categories should be noted when interpreting bivariate results for that variable.
+
+VARIABLES TO CARRY FORWARD WITH CAUTION
+
+`RaceEthnicity/AI` (n=642, 0.5%) should be retained but interpreted cautiously in bivariate stages and may be unstable in multivariate models. `LimitedEnglishProficiencyIndicator` (n=2,625, 2.1%) will be retained and its relationship to `english.learner` and `non.english.home` monitored throughout the bivariate analysis.
 
 <br>
 
 ```{r final master}
 master.final.after.mca <- master.original %>%
-  select(-HomelessIndicator, -attended.ps.within.first.year.hsgrad) %>%
-  mutate(ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector %in% c("2", "3", "5", "6", "7", "8", "9", "10", "11") | is.na(ps.grad.InstitutionSector), "11", ps.grad.InstitutionSector),
-         highest.cred.level = ifelse(highest.cred.level %in% c("Bachelor degree", "Master degree or higher"), "Bachelor degree or higher", as.character(highest.cred.level))) %>%
+  select(-HomelessIndicator, -sat.taken) %>%
+  mutate(ps.grad.InstitutionSector = ifelse(ps.grad.InstitutionSector %in% c("3", "5", "6", "7", "8", "9"), "11", as.character(ps.grad.InstitutionSector)),
+         ps.grad.location = ifelse(ps.grad.location %in% c("PS grad region", "PS grad EDR"), "PS grad region", as.character(ps.grad.location)),
+         ps.grad.location = as.factor(ps.grad.location),
+         highest.cred.level = ifelse(highest.cred.level %in% c("Associate degree", "Less than Associate Degree"), "Less than Bachelors",
+                                     ifelse(highest.cred.level %in% c("Bachelor degree", "Master degree or higher"), "Bachelors or higher", as.character(highest.cred.level))),
+         highest.cred.level = as.factor(highest.cred.level)) %>%
   select(1:ps.grad.in.MN, ps.grad.location, mn.emp.record.hs.grad.year:ncol(.))
 
 names(master.final.after.mca)
