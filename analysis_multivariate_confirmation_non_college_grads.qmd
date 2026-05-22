@@ -1,0 +1,1448 @@
+---
+title: "Multivariate Confirmation Analysis - Non-college grads"
+editor: visual
+---
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(tidyverse)
+library(sf)
+library(ggrepel)
+library(scales)
+library(shiny)
+library(shinycssloaders)
+library(ggiraph)
+library(kableExtra)
+library(rmapshaper)
+library(cowplot)
+library(DT)
+library(htmlwidgets)
+library(RColorBrewer)
+library(readxl)
+library(janitor)
+library(lubridate)
+library(systemfonts)
+reset_font_cache()
+library(ggtext)
+library(gmodels)
+library(fastDummies)
+library(car)
+library(glmnet)
+library(glmnetUtils)
+library(pscl)
+library(sjPlot)
+library(ggforce)
+library(broom)
+library(forcats)
+library(stringr)
+```
+
+```{r themes and shapefiles, include=FALSE}
+theme_bar <- theme_bw() +
+  theme(panel.grid.major = element_line(color = "grey70", linewidth  = 0.1),
+        panel.grid.minor = element_blank(),
+        axis.ticks = element_blank(),
+        axis.text = element_text(face = "bold"),
+        panel.border = element_blank(),
+        legend.background = element_rect(fill = "transparent", color = "transparent"),
+        legend.key = element_rect(fill = "transparent"),
+        legend.key.size = unit(1, "lines"),
+        legend.margin = margin(0,0,0,0),
+        legend.title = element_blank(),
+        legend.text = element_text(margin = margin(l = 2)),
+        text = element_text(family = "Arial") ,
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold"))
+
+theme_line <- theme_bw() +
+  theme(legend.background = element_rect(fill = "transparent", color = "transparent"),
+        legend.key = element_rect(fill = "transparent"),
+        legend.text = element_text(margin = margin(l = 2)),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(color = "grey70", linewidth = 0.1),
+        axis.ticks = element_blank(),
+        axis.text = element_text(face = "bold"),
+        panel.border = element_blank(),
+        legend.margin = margin(0,0,0,0),
+        legend.key.size = unit(1, "lines"),
+        text = element_text(family = "Arial") ,
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold"))
+
+
+theme_sf <- theme_bw() +
+  theme(axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_line(color = "white"),
+        panel.border = element_blank(),
+        legend.title = element_blank(),
+        legend.text = element_text(margin = margin(l = 2)),
+        legend.margin = margin(0,0,0,0),
+        legend.key.size = unit(1, "lines"),
+        text = element_text(family = "Arial") ,
+        plot.title.position = "plot",
+        plot.title = element_text(face = "bold"))
+
+regions <- read_csv("/Users/kellyasche/Library/CloudStorage/GoogleDrive-kasche@ruralmn.org/My Drive/Data Prep/R Projects/Join docs/county_regions.csv") %>%
+    select(5,6) %>%
+    unique() %>%
+    mutate(edr = str_replace(edr, "  ", " "),
+           planning.region = str_replace(planning.region, " Minnesota", ""),
+           planning.region = fct_relevel(planning.region, "Northwest", "Northeast", "Central", "Seven County Mpls-St Paul", "Southwest", "Southeast"),
+           edr = fct_relevel(edr, "EDR 1 - Northwest", "EDR 2 - Headwaters", "EDR 3 - Arrowhead", "EDR 4 - West Central", "EDR 5 - North Central", "EDR 6E- Southwest Central", "EDR 6W- Upper Minnesota Valley", "EDR 7E- East Central", "EDR 7W- Central", "EDR 8 - Southwest", "EDR 9 - South Central", "EDR 10 - Southeast", "EDR 11 - 7 County Twin Cities", "Minnesota"))
+
+counties.regions <- read_csv("/Users/kellyasche/Library/CloudStorage/GoogleDrive-kasche@ruralmn.org/My Drive/Data Prep/R Projects/Join docs/county_regions.csv") %>%
+  rename(mif = `MIF Region`) %>%
+  mutate(countyfp = formatC(countyfp, width = 3, flag = "0"),
+         Name = str_to_title(Name),
+         Name = str_replace(Name, "Q", "q"),
+         Name = str_replace(Name, "Of The", "of the"),
+         Name = str_replace(Name, "Mcleod", "McLeod"),
+         Dem_Desc = ifelse(Name == "Minnesota", "Minnesota", Dem_Desc) ,
+         edr = str_replace(edr, "  ", " "),
+         planning.region = str_replace(planning.region, " Minnesota", ""),
+         planning.region = fct_relevel(planning.region, "Northwest", "Northeast", "Central", "Seven County Mpls-St Paul", "Southwest", "Southeast"),
+         edr = fct_relevel(edr, "EDR 1 - Northwest", "EDR 2 - Headwaters", "EDR 3 - Arrowhead", "EDR 4 - West Central", "EDR 5 - North Central", "EDR 6E- Southwest Central", "EDR 6W- Upper Minnesota Valley", "EDR 7E- East Central", "EDR 7W- Central", "EDR 8 - Southwest", "EDR 9 - South Central", "EDR 10 - Southeast", "EDR 11 - 7 County Twin Cities", "Minnesota"),
+         Dem_Desc = fct_relevel(Dem_Desc, "Entirely rural", "Town/rural mix", "Urban/town/rural mix", "Entirely urban"))
+
+counties.regions.1 <- counties.regions %>%
+  mutate(statefp = "27",
+         project.pr = ifelse(edr %in% c("EDR 1 - Northwest", "EDR 2 - Headwaters", "EDR 4 - West Central"), "Northwest",
+                             ifelse(edr == "EDR 3 - Arrowhead", "Northeast",
+                                    ifelse(edr %in% c("EDR 5 - North Central", "EDR 7E- East Central", "EDR 7W- Central"), "Central",
+                                           ifelse(edr %in% c("EDR 6E- Southwest Central", "EDR 6W- Upper Minnesota Valley", "EDR 8 - Southwest"), "Southwest",
+                                                  ifelse(edr %in% c("EDR 9 - South Central", "EDR 10 - Southeast"), "Southern", as.character(planning.region)))))),
+         project.pr = fct_relevel(project.pr, "Northwest", "Northeast", "Central", "Seven County Mpls-St Paul", "Southwest", "Southern"))
+
+
+color.ruca <- c("Entirely rural" = "#009933", "Town/rural mix" = "#99CC33", "Urban/town/rural mix" = "#CC9966", "Entirely urban" = "#754C29", "Minnesota" = "black")
+
+color.pr <- c("Northwest" = 	"#4575b4", "Northeast" = "grey", "Central" = "#fee090", "Seven County Mpls-St Paul" = "#d73027", "Southwest" = "#91bfdb", "Southeast" = "#fc8d59", "Minnesota" = "black")
+
+color.edr <- c("EDR 1 - Northwest" = "#b3cde3", "EDR 2 - Headwaters" = "#8c96c6", "EDR 3 - Arrowhead" = "#fe9929", "EDR 4 - West Central" = "#8856a7", "EDR 5 - North Central" = "#810f7c", "EDR 6E- Southwest Central" = "#e5f5f9", "EDR 6W- Upper Minnesota Valley" = "#bdc9e1", "EDR 7E- East Central" = "#99d8c9", "EDR 7W- Central" = "#2ca25f", "EDR 8 - Southwest" = "#74a9cf", "EDR 9 - South Central" = "#0570b0", "EDR 10 - Southeast" = "#d7301f", "EDR 11 - 7 County Twin Cities" = "#d8b365", "Minnesota" = "black")
+
+color.edr.simple <- c("EDR 1" = "#b3cde3", "EDR 2" = "#8c96c6", "EDR 3" = "#fe9929", "EDR 4" = "#8856a7", "EDR 5" = "#810f7c", "EDR 6E" = "#e5f5f9", "EDR 6W" = "#bdc9e1", "EDR 7E" = "#99d8c9", "EDR 7W" = "#2ca25f", "EDR 8" = "#74a9cf", "EDR 9" = "#0570b0", "EDR 10" = "#d7301f", "EDR 11" = "#d8b365", "Minnesota" = "black")
+
+color.pr.edr <- c ("Northwest" = "#4575b4","Northeast" = "#e0f3f8", "Central" = "#fee090", "Seven County Mpls-St Paul" = "#d73027", "Southwest" = "#91bfdb", "Southeast" = "#fc8d59", "Minnesota" = "black", "EDR 1 - Northwest" = "#b3cde3", "EDR 2 - Headwaters" = "#8c96c6", "EDR 3 - Arrowhead" = "#fe9929", "EDR 4 - West Central" = "#8856a7", "EDR 5 - North Central" = "#810f7c", "EDR 6E- Southwest Central" = "#e5f5f9", "EDR 6W- Upper Minnesota Valley" = "#bdc9e1", "EDR 7E- East Central" = "#99d8c9", "EDR 7W- Central" = "#2ca25f", "EDR 8 - Southwest" = "#74a9cf", "EDR 9 - South Central" = "#0570b0", "EDR 10 - Southeast" = "#d7301f", "EDR 11 - 7 County Twin Cities" = "#d8b365")
+
+mn_counties <- st_read("/Users/kellyasche/Library/CloudStorage/GoogleDrive-kasche@ruralmn.org/My Drive/Data Prep/R Projects/Shapefiles/County shapefiles/MNCounties_MNDOT.shp", quiet = TRUE) %>%
+  ms_simplify(keep = .01, keep_shapes = TRUE) %>%
+  rename(countyfp = FIPS_CODE)
+
+```
+
+```{r master dataset}
+master.original <- read_csv("Data/SLEDS/Masters/After analysis/Master-final-after-mca.csv")
+
+master.states <- read_csv("Data/SLEDS/Masters/States/annual-seven-states.csv") %>%
+  filter(grad.year %in% c("grad.year.1", "grad.year.5", "grad.year.10")) %>%
+  select(PersonID, grad.year, states) %>%
+  pivot_wider(names_from = grad.year, values_from = states)
+
+master <- master.original %>%
+  left_join(master.states, by = "PersonID")
+
+kable(head(master))
+
+kable(names(master))
+```
+
+# Multivariate Confirmation Analysis: Non–Postsecondary Graduates
+
+The bivariate analyses conducted to this point have established a rich and detailed account of how demographic characteristics, high school context, high school accomplishments, and postsecondary experience are each associated with workforce participation outcomes among non-college completers in Southeast Minnesota. These analyses identified consistent patterns — the protective role of CTE engagement, the dominance of postsecondary attendance, the geographic absence signature of language minority non-completers, the null finding for place-based high school context — and documented how these patterns evolve across the first five years after exiting formal education.
+
+Bivariate analysis, however, examines each predictor in isolation. It cannot determine whether the associations identified reflect independent relationships or whether they are driven by the correlation structure among predictors. Special education graduates are disproportionately low-income. English learners are disproportionately members of racial and ethnic minority groups. Non-CTE graduates are disproportionately graduates who did not attend postsecondary. When multiple disadvantages co-occur in the same individuals, bivariate analysis cannot distinguish the independent contribution of each from the shared variance they hold in common. A variable that appears strongly associated with outcomes in isolation may lose that association — or retain it fully — once other predictors are accounted for simultaneously.
+
+Multivariate logistic regression addresses this limitation directly. By modeling the simultaneous relationship between multiple predictors and the outcome, it allows each variable's association to be evaluated net of the others included in the model. The purpose of this analysis is explicitly confirmatory rather than exploratory: the goal is not to discover new associations but to assess whether the strongest and most interpretively important findings from the bivariate analysis remain directionally consistent and statistically meaningful when the correlation structure of the predictor set is accounted for. This provides a stronger evidentiary basis for the conclusions that the bivariate analysis suggested and grounds the policy recommendations that follow in a more rigorous analytical foundation.
+
+<br>
+
+# Methodology
+
+## STUDY POPULATION
+
+The study population consists of all non-college completers in the Southeast Minnesota longitudinal workforce pathway dataset — specifically, high school graduates from Economic Development Regions 9 (South Central) and 10 (Southeast) across the 2008–2018 graduation cohorts who did not complete a postsecondary credential (ps.grad == "No"). This population totals 32,878 individuals and represents the full population of non-completers in the region across the study period, not a sample. As a result, conventional inferential statistics — p-values, confidence intervals — function in this analysis as descriptive precision measures rather than as tests of whether findings would generalize to a larger population. All findings describe the actual experience of this defined population.
+
+Graduates who attended postsecondary education but did not complete a credential are retained in the analytic population. Postsecondary attendance is treated as a predictor variable in the third modeling block rather than as an exclusion criterion, consistent with the bivariate analysis and preserving the full analytical value of the attendance-versus-non-attendance distinction within the non- completer population.
+
+## OUTCOME VARIABLE
+
+The outcome variable for all models is sustained regional workforce participation, operationalized as a binary indicator distinguishing graduates who achieved sustained employment in the Southeast Minnesota region (Sustained WF — Region = 1) from all other workforce participation outcomes (= 0). The "all other" category encompasses sustained employment elsewhere in Minnesota, in-region marginal employment, other disconnected employment, and no Minnesota employment record.
+
+This outcome is selected for three reasons. First, sustained regional employment is the policy outcome of primary interest throughout this study — the goal of regional workforce development is to connect residents to stable, meaningful employment within the region, and this category operationalizes that goal directly. Second, the bivariate analyses consistently identified sustained regional employment as the category most strongly and coherently differentiated by the predictor set, making it the most analytically tractable outcome for multivariate confirmation. Third, the binary formulation is appropriate for logistic regression and produces odds ratios that are directly interpretable in terms of the relative likelihood of achieving the primary policy-relevant outcome.
+
+The outcome is assessed at three time points: one year after high school graduation (grad.year.1), five years after graduation (grad.year.5), and ten years after graduation (grad.year.10). Examining outcomes at three time points allows the analysis to assess whether predictor associations are stable, strengthening, or attenuating as non-completers age into their early and middle careers, extending the temporal scope of the bivariate findings.
+
+## INDEPENDENT VARIABLES
+
+Variables are organized into three domain blocks corresponding to the structure of the bivariate analysis. Each block is described below with the rationale for inclusion and exclusion decisions.
+
+**Demographic Characteristics**
+
+Five variables are included in the demographic block.
+
+Gender (binary: Female/Male) captures the consistent male advantage in sustained regional employment documented across all five years of the bivariate analysis, reflecting occupational sorting into trade, construction, and manufacturing roles that offer immediate regional employment without credential requirements.
+
+Economic status (binary: low-income/not low-income) captures the accumulating local underutilization disadvantage associated with economic disadvantage, which grew stronger over the bivariate observation window and warrants confirmation as an independent predictor net of race, ethnicity, and other demographic characteristics.
+
+Special education status (binary: yes/no) was the strongest demographic predictor of persistent disconnection in the bivariate analysis (V=0.113) and the variable associated with the largest single-year no-record differential. Its independent association net of economic status and race is a key confirmatory question.
+
+Race and ethnicity (categorical: American Indian, Asian/Pacific Islander, Black, Hispanic, White — with White as the reference category) captures the substantial racial and ethnic variation in outcomes documented in the bivariate analysis, including the distinctive other-disconnected employment concentration among Black non-completers and the geographic absence signature among American Indian graduates.
+
+English learner status (binary: yes/no) represents the language minority cluster of variables — english.learner, non.english.home, and LimitedEnglishProficiencyIndicator — all of which showed nearly identical bivariate patterns. English learner status is selected as the single representative because it produced the strongest and most consistent associations, has the largest group size of the three, and is the most policy-relevant classification. Including all three would introduce multicollinearity without adding substantive information.
+
+**High School Characteristics**
+
+One variable is included in the high school characteristics block.
+
+Average local unemployment rate (continuous) was the only high school context variable to show consistent and interpretively meaningful pairwise differentiation in the bivariate analysis, capturing the labor market push dynamic by which graduates from higher-unemployment communities are more likely to seek sustained employment outside the region. EDR, community type (Dem_Desc), and average wages as a percent of the state average are excluded on the basis of consistently negligible bivariate associations that produced no meaningful differentiation in either the persistence or refined outcome frameworks.
+
+**High School Accomplishments and Postsecondary Orientation**
+
+Four variables are included in the accomplishments and postsecondary block.
+
+ACT participation (binary: took ACT yes/no) captures academic engagement and labor market orientation. The full ACT composite score is not used in order to preserve the complete analytic sample of 32,878; restricting to ACT takers would reduce the sample to approximately 14,687. ACT participation itself showed strong and consistent bivariate associations and is the more appropriate variable for a confirmatory model intended to generalize across the full non-completer population.
+
+CTE achievement level (ordinal: No CTE, CTE Participant, CTE Concentrator or Completor — with No CTE as the reference category) was the strongest high school accomplishments predictor in the bivariate analysis across both frameworks, with a true dose- response gradient in sustained regional employment that held across all five years. Total CTE courses taken is excluded to avoid multicollinearity with CTE achievement level; the two variables measure overlapping constructs, and CTE achievement level is the more policy-actionable classification.
+
+AP exam participation (binary: yes/no) is included to formally test the college-orientation paradox identified in the bivariate analysis — specifically, whether AP exam participation retains its counterintuitive negative association with sustained regional employment after controlling for postsecondary attendance and other accomplishments variables.
+
+Postsecondary attendance (binary: yes/no) was the single strongest predictor in the entire bivariate analysis (V=0.195 at Year 1) and is the non-negotiable inclusion in the accomplishments block. Its independent association net of demographic characteristics and high school accomplishments is the central confirmatory question of Model 3. PSEO participation is excluded because its bivariate associations were the weakest in the accomplishments domain and its story largely replicates that of AP exam participation without adding independent analytical value.
+
+## MODELING STRATEGY
+
+Three logistic regression models are estimated for each of the three outcome time points (grad.year.1, grad.year.5, grad.year.10), producing nine models in total. The models follow a cumulative block entry sequence in which each successive model adds a domain block to the variables already included in the prior model.
+
+Model 1 includes the five demographic variables. It establishes the baseline association between demographic characteristics and sustained regional employment at each time point, net of the intercorrelations among demographic predictors.
+
+Model 2 adds average local unemployment rate to the demographic block. The primary purpose of Model 2 is to formally test whether high school context adds any explanatory value beyond demographic characteristics — a question the bivariate analysis strongly suggested would be answered in the negative.
+
+Model 3 adds the four accomplishments and postsecondary variables to the full prior model. This is the primary confirmatory model. It tests whether CTE achievement, ACT participation, AP exam participation, and postsecondary attendance retain meaningful independent associations with sustained regional employment after accounting for demographic characteristics, high school context, and the intercorrelations among the accomplishments variables themselves.
+
+The block sequence is designed to mirror the theoretical ordering of the bivariate analysis — demographics as baseline structural characteristics, high school context as place-based overlay, and accomplishments and postsecondary as individual choices and experiences layered on top — and to formally test whether each successive domain adds explanatory value to the model.
+
+## EVALUATION CRITERIA
+
+Model fit and variable-level associations are evaluated using four criteria.
+
+Model comparison across blocks is assessed using the Akaike Information Criterion (AIC). Lower AIC values indicate better model fit penalized for model complexity. Meaningful AIC reduction from Model 1 to Model 2 would indicate that high school context adds explanatory value beyond demographics; based on the bivariate findings, no meaningful reduction is expected. Meaningful AIC reduction from Model 2 to Model 3 is expected to be substantial, consistent with the strong bivariate associations in the accomplishments and postsecondary domain.
+
+Odds ratios (ORs) with 95% confidence intervals are the primary measure of variable-level association strength and direction. An OR greater than 1.0 indicates a higher likelihood of sustained regional employment relative to the reference category; an OR less than 1.0 indicates a lower likelihood. Directional consistency with the bivariate findings is the primary confirmation criterion — a variable that showed a positive association with sustained regional employment in the bivariate analysis should show an OR greater than 1.0 in the multivariate model, and vice versa.
+
+Statistical significance is evaluated at the conventional p \< 0.05 threshold, with p \< 0.001 noted for stronger associations. Given the full population nature of the dataset, statistical significance is treated as a precision indicator rather than an inferential test — very small but practically meaningless associations may reach significance due to the large n, and effect magnitude is weighted alongside significance in interpretation.
+
+Practical significance is assessed by the magnitude of odds ratios in conjunction with their statistical significance. Odds ratios in the range of 1.0–1.2 or 0.8–1.0 are treated as negligible regardless of p-value. Odds ratios exceeding 1.5 or below 0.67 — representing at least a 50% change in the odds of sustained regional employment — are treated as practically meaningful. This threshold is applied consistently across all models and time points to distinguish findings that warrant policy attention from those that are statistically detectable but substantively trivial.
+
+<br>
+
+# Prep data
+
+The first thing I need to do is setup my dataset for modeling. I'm going to create the workforce participation into a binary and will use grad.year.1, grad.year.5 and grad.year.10 as my modeling year.
+
+```{r}
+master.model.1 <- master %>%
+  filter(ps.grad == "No",
+         RaceEthnicity != "Unknown") %>%
+  select(PersonID, Gender, economic.status, SpecialEdStatus, RaceEthnicity, english.learner, avg.unemp.rate, took.ACT, cte.achievement, ap.exam, attended.ps, grad.year.1) %>%
+  filter(grad.year.1 != "After 2023",
+         grad.year.1 != "Attending ps") %>%
+  mutate(grad.year.1 = ifelse(grad.year.1 %in% c("Meaningful emp region", "Meaningful emp County", "Meaningful emp EDR"), "Meaningful emp region", grad.year.1),
+         grad.year.1 = str_replace(grad.year.1, ", not attending ps", ""),
+         grad.year.1 = ifelse(grad.year.1 == "Meaningful emp region", 1, 0),
+         Gender = fct_relevel(Gender, "M"),
+         RaceEthnicity = fct_relevel(RaceEthnicity, "White"),
+         economic.status = as.character(economic.status),
+         economic.status = fct_relevel(economic.status, "0"),
+         SpecialEdStatus = as.character(SpecialEdStatus),
+         SpecialEdStatus = fct_relevel(SpecialEdStatus, "0"),
+         english.learner = as.character(english.learner),
+         english.learner = fct_relevel(english.learner, "0"),
+         took.ACT = fct_relevel(took.ACT, "No"),
+         cte.achievement = fct_relevel(cte.achievement, "No CTE"),
+         ap.exam = as.character(ap.exam),
+         ap.exam = fct_relevel(ap.exam, "0"),
+         attended.ps = fct_relevel(attended.ps, "No"))
+
+kable(head(master.model.1))
+
+kable(names(master.model.1))
+
+
+master.model.5 <- master %>%
+  filter(ps.grad == "No",
+         RaceEthnicity != "Unknown") %>%
+  select(PersonID, Gender, economic.status, SpecialEdStatus, RaceEthnicity, english.learner, avg.unemp.rate, took.ACT, cte.achievement, ap.exam, attended.ps, grad.year.5) %>%
+  filter(grad.year.5 != "After 2023",
+         grad.year.5 != "Attending ps") %>%
+  mutate(grad.year.5 = ifelse(grad.year.5 %in% c("Meaningful emp region", "Meaningful emp County", "Meaningful emp EDR"), "Meaningful emp region", grad.year.5),
+         grad.year.5 = str_replace(grad.year.5, ", not attending ps", ""),
+         grad.year.5 = ifelse(grad.year.5 == "Meaningful emp region", 1, 0),
+         Gender = fct_relevel(Gender, "M"),
+         RaceEthnicity = fct_relevel(RaceEthnicity, "White"),
+         economic.status = as.character(economic.status),
+         economic.status = fct_relevel(economic.status, "0"),
+         SpecialEdStatus = as.character(SpecialEdStatus),
+         SpecialEdStatus = fct_relevel(SpecialEdStatus, "0"),
+         english.learner = as.character(english.learner),
+         english.learner = fct_relevel(english.learner, "0"),
+         took.ACT = fct_relevel(took.ACT, "No"),
+         cte.achievement = fct_relevel(cte.achievement, "No CTE"),
+         ap.exam = as.character(ap.exam),
+         ap.exam = fct_relevel(ap.exam, "0"),
+         attended.ps = fct_relevel(attended.ps, "No"))
+
+
+kable(head(master.model.5))
+
+kable(names(master.model.5))
+
+master.model.10 <- master %>%
+  filter(ps.grad == "No",
+         RaceEthnicity != "Unknown") %>%
+  select(PersonID, Gender, economic.status, SpecialEdStatus, RaceEthnicity, english.learner, avg.unemp.rate, took.ACT, cte.achievement, ap.exam, attended.ps, grad.year.10) %>%
+  filter(grad.year.10 != "After 2023",
+         grad.year.10 != "Attending ps") %>%
+  mutate(grad.year.10 = ifelse(grad.year.10 %in% c("Meaningful emp region", "Meaningful emp County", "Meaningful emp EDR"), "Meaningful emp region", grad.year.10),
+         grad.year.10 = str_replace(grad.year.10, ", not attending ps", ""),
+         grad.year.10 = ifelse(grad.year.10 == "Meaningful emp region", 1, 0),
+         Gender = fct_relevel(Gender, "M"),
+         RaceEthnicity = fct_relevel(RaceEthnicity, "White"),
+         economic.status = as.character(economic.status),
+         economic.status = fct_relevel(economic.status, "0"),
+         SpecialEdStatus = as.character(SpecialEdStatus),
+         SpecialEdStatus = fct_relevel(SpecialEdStatus, "0"),
+         english.learner = as.character(english.learner),
+         english.learner = fct_relevel(english.learner, "0"),
+         took.ACT = fct_relevel(took.ACT, "No"),
+         cte.achievement = fct_relevel(cte.achievement, "No CTE"),
+         ap.exam = as.character(ap.exam),
+         ap.exam = fct_relevel(ap.exam, "0"),
+         attended.ps = fct_relevel(attended.ps, "No"))
+
+
+kable(head(master.model.10))
+
+kable(names(master.model.10))
+
+```
+
+We now have `r comma(nrow(master.model.5))` individuals to model with `r ncol(master.model.5) - 2` variables not including `grad.year.5`.
+
+<br>
+
+# Modeling - `grad.year.1`
+
+## **Model 1 — Demographic Characteristics (Baseline)**
+
+MODEL FIT
+
+Model 1 accounts for a small but meaningful share of the variation in sustained regional employment at Year 1 (Nagelkerke R²=0.017, AIC=37,247). The low pseudo-R² is expected for a demographics-only model — demographic characteristics establish the structural baseline but do not fully explain who achieves regional labor market attachment in the first year after high school. The Hosmer-Lemeshow goodness-of-fit test is significant (X²=21.4, df=5, p\<.001), indicating some miscalibration between predicted and observed outcomes across probability deciles. Given the full population size of 31,800, this test is highly sensitive to small deviations from perfect fit and should not be interpreted as evidence that the model is substantively misspecified. All VIF values are below 1.5, confirming that multicollinearity is not a concern in this model.
+
+GENDER
+
+Female non-completers have 20% lower odds of achieving sustained regional employment at Year 1 compared to male non-completers, net of all other demographic characteristics (OR=0.803, 95% CI 0.763–0.845, p\<.001). This confirms the bivariate finding of a consistent male advantage in regional labor market attachment in the first year after exiting formal education, consistent with the concentration of male non-completers in trade, construction, and manufacturing occupations that offer immediate regional employment. The association is robust and independent of race, economic status, and special education status.
+
+RACE AND ETHNICITY
+
+Race and ethnicity shows the widest range of associations in the demographic block and contains the analysis's most practically significant findings. All minority groups show lower odds of sustained regional employment than White graduates, but the magnitude varies substantially across groups.
+
+American Indian graduates show the largest negative association (OR=0.444, 95% CI 0.321–0.600, p\<.001) — less than half the odds of sustained regional employment compared to White graduates. This is the largest effect of any predictor in Model 1. The small group size (n=212) warrants interpretive caution, but the direction and magnitude are consistent with the bivariate finding of a 66.0% persistent disconnection rate for American Indian non-completers.
+
+Black graduates show the second largest negative association (OR=0.520, 95% CI 0.451–0.597, p\<.001) — approximately half the odds of sustained regional employment relative to White graduates. This is a large, independent effect that survives adjustment for economic status and English learner status, confirming that the Black non-completer disadvantage in regional labor market attachment is not explained by socioeconomic or language minority status.
+
+Asian/Pacific Islander graduates show a moderate negative association (OR=0.734, 95% CI 0.619–0.865, p\<.001). This is meaningful but smaller in magnitude than the American Indian and Black associations, consistent with the bivariate finding that Asian/PI graduates show intermediate outcomes between White graduates and the most disadvantaged minority groups.
+
+Hispanic graduates are not significantly different from White graduates in sustained regional employment odds at Year 1 (OR=0.905, 95% CI 0.816–1.004, p=.060). The point estimate indicates lower odds but the confidence interval crosses 1.0. This is consistent with the bivariate finding that Hispanic non-completers showed relatively modest persistent disconnection differentials compared to other minority groups. After accounting for economic status and English learner status — characteristics disproportionately represented among Hispanic graduates — the remaining association is not statistically distinguishable from zero.
+
+ECONOMIC STATUS
+
+Low-income status is not a significant independent predictor of sustained regional employment at Year 1 after controlling for race, ethnicity, special education status, and English learner status (OR=0.964, 95% CI 0.914–1.016, p=.172). The point estimate indicates slightly lower odds for low-income graduates, but the effect is negligible in magnitude and non-significant. This attenuation from the bivariate finding reflects the substantial overlap between economic disadvantage and the other demographic characteristics in the model — economic status shares variance with race, ethnicity, and special education status, and its independent contribution at Year 1 is not meaningfully distinguishable from zero once those variables are controlled. This is an important multivariate clarification of the bivariate finding: economic disadvantage in the Year 1 sustained regional employment outcome is largely mediated through its co-occurrence with other demographic disadvantages rather than operating as an independent barrier.
+
+SPECIAL EDUCATION STATUS
+
+Special education graduates have 29% lower odds of achieving sustained regional employment at Year 1 compared to non-special education graduates, net of all other demographic characteristics (OR=0.706, 95% CI 0.662–0.753, p\<.001). This is the second largest effect in the model and confirms that the special education disadvantage in regional labor market attachment is independent of race, economic status, and English learner status. More than any other finding in Model 1, this confirms the bivariate identification of special education status as the dominant demographic predictor of workforce outcomes — the association is large, precise, and robust to multivariate adjustment.
+
+ENGLISH LEARNER STATUS
+
+English learner status is not a significant independent predictor of sustained regional employment at Year 1 after controlling for race, ethnicity, economic status, and special education status (OR=0.962, 95% CI 0.874–1.058, p=.430). This is the most consequential attenuation finding in Model 1 and requires careful interpretation. The bivariate analysis identified English learner status as the second strongest demographic predictor (V=0.096), with a 15.1 percentage point persistent disconnection gap. The multivariate result indicates that this bivariate association is largely explained by the correlation between English learner status and race and ethnicity — specifically, English learner non-completers are disproportionately Hispanic, Asian/PI, and members of other minority groups, and once race and ethnicity is controlled, English learner status itself carries no independent association with Year 1 sustained regional employment. The disadvantage is real, but it operates through racial and ethnic group membership rather than through language minority status as an independent pathway.
+
+SUMMARY
+
+Model 1 confirms that demographic characteristics are meaningful but structurally uneven predictors of sustained regional employment at Year 1. Special education status and race and ethnicity — particularly American Indian and Black group membership — retain large and independent associations with lower odds of regional labor market attachment. Gender retains a consistent and independent male advantage. Economic status and English learner status, despite strong bivariate associations, do not retain independent significance once the full demographic block is controlled, indicating that their bivariate associations are largely attributable to their co-occurrence with race, ethnicity, and special education status rather than to independent causal pathways. These attenuation findings are among the most analytically important results of the multivariate confirmation analysis and will be carried forward as the block sequence develops.
+
+```{r}
+model1 <- glm(
+  grad.year.1 ~
+    Gender + 
+    RaceEthnicity +
+    economic.status +
+    SpecialEdStatus +
+    english.learner,
+  family = binomial,
+  data = master.model.1
+)
+
+model1
+
+# Odds ratios with 95% confidence intervals
+exp(cbind(OR = coef(model1), confint(model1)))
+
+# Wald test p-values and full summary
+summary(model1)
+
+# Nagelkerke R²
+pscl::pR2(model1)
+
+# Hosmer-Lemeshow test
+ResourceSelection::hoslem.test(model1$y, fitted(model1))
+
+# VIF values
+car::vif(model1)
+
+or_plot <- tidy(model1, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Make labels nicer (edit these replacements to match your exact factor labels)
+    term = str_replace_all(term, c(
+      "RaceEthnicity" = "Race: ",
+      "economic.status" = "Economic status: ",
+      "Gender" = "Gender: ",
+      "SpecialEdStatus" = "Special Ed: ",
+      "Dem_Desc" = "Dem_Desc: "
+    )),
+    # Put most important effects near the top (optional: tweak ordering later)
+    term = fct_reorder(term, estimate)
+  )
+
+ggplot(or_plot, aes(x = estimate, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_vline(xintercept = c(0.5, 0.75, 1.25, 1.5, 2),
+             color = "grey85") +
+  geom_point() +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high),
+    orientation = "y",
+    width = 0.2
+  ) +
+  scale_x_log10(
+    breaks = c(0.5, 0.75, 1, 1.25, 1.5, 2),
+    labels = c("0.5", "0.75", "1.0", "1.25", "1.5", "2.0")
+  ) +
+  theme_line +
+  labs(
+    x = "Odds ratio (log scale)",
+    y = NULL
+  )
+
+
+
+```
+
+<br>
+
+## **Model 2 — High School Characteristics and Local Labor Market**
+
+MODEL FIT AND COMPARISON TO MODEL 1
+
+Adding average local unemployment rate to the demographic block produces a modest but real improvement in model fit. AIC decreases from 37,247 in Model 1 to 37,186 in Model 2 — a reduction of 61 points that exceeds the conventional threshold of 10 points for meaningful improvement. The Nagelkerke R² increases from 0.017 to 0.019. Notably, the Hosmer-Lemeshow goodness-of-fit test improves substantially, moving from significant miscalibration in Model 1 (p\<.001) to acceptable fit in Model 2 (X²=8.6, df=8, p=.377). This improvement in calibration suggests that local unemployment rate captures meaningful variation in the geographic distribution of outcome probabilities that the demographic block alone did not account for.
+
+This AIC improvement is somewhat larger than the bivariate analysis predicted. While the bivariate associations for high school context variables were individually weak, average local unemployment rate's relationship with the outcome appears more informative in the multivariate context than its standalone bivariate statistics suggested — likely because it accounts for geographic clustering of disadvantage that is partially independent of individual demographic characteristics. Nevertheless, the overall contribution of the high school characteristics block remains modest in absolute terms. The practical variance explained increases by less than half a percentage point. The block adds precision to the model's geographic calibration without substantially changing the substantive story told by the demographic predictors.
+
+DEMOGRAPHIC VARIABLES — STABILITY ACROSS MODELS
+
+All demographic variable associations from Model 1 are remarkably stable in Model 2. Odds ratios shift by no more than 0.02 for any variable, and significance patterns are unchanged — Gender, SpecialEdStatus, RaceEthnicityAI, RaceEthnicityAsian/PI, and RaceEthnicityBlack all remain significant at p\<.001; RaceEthnicityHispanic, economic.status, and english.learner remain non-significant. This stability confirms that the demographic associations identified in Model 1 are not confounded by geographic clustering of graduates in higher- or lower-unemployment communities. The individual-level demographic findings stand independent of the local labor market context in which graduates attended high school.
+
+AVERAGE LOCAL UNEMPLOYMENT RATE
+
+Average local unemployment rate is a significant independent predictor of sustained regional employment at Year 1, net of all demographic characteristics (OR=0.929, 95% CI 0.912–0.946, p\<.001). Each one-percentage-point increase in the average local unemployment rate of the community where a graduate attended high school is associated with approximately 7% lower odds of achieving sustained regional employment at Year 1.
+
+This finding requires careful interpretation. The negative association does not simply mean that graduates from higher- unemployment areas have worse outcomes overall — it means they are less likely specifically to achieve sustained regional employment. As the bivariate analysis established, this reflects a labor market push dynamic: graduates from higher-unemployment communities are more likely to seek and achieve sustained employment outside the region rather than within it. The negative association with sustained regional employment is the expected multivariate expression of that push effect, and its significance here confirms that it operates independently of individual demographic characteristics. Higher local unemployment pushes mobile non-completers away from the regional labor market regardless of their gender, race, economic status, or special education history.
+
+SUMMARY
+
+Model 2 confirms that high school context — represented by average local unemployment rate — adds a small but real independent contribution to the prediction of sustained regional employment at Year 1, beyond what individual demographic characteristics explain. The improvement is primarily one of geographic calibration rather than substantive reinterpretation: the demographic findings from Model 1 are fully stable, and the unemployment rate effect is consistent with the labor market push dynamic identified in the bivariate analysis. The high school characteristics block does not change the story told by demographics — it adds a structural labor market backdrop against which the individual-level demographic associations operate. Model 3 will test whether the high school accomplishments and postsecondary variables produce the more substantial improvement anticipated from the bivariate findings.
+
+```{r}
+model2 <- glm(
+  grad.year.1 ~
+    Gender + 
+    RaceEthnicity +
+    economic.status +
+    SpecialEdStatus +
+    english.learner +
+    avg.unemp.rate,
+  family = binomial,
+  data = master.model.1
+)
+
+model2
+
+# Odds ratios with 95% confidence intervals
+exp(cbind(OR = coef(model2), confint(model2)))
+
+# Wald test p-values and full summary
+summary(model2)
+
+# Nagelkerke R²
+pscl::pR2(model2)
+
+# Hosmer-Lemeshow test
+ResourceSelection::hoslem.test(model2$y, fitted(model2))
+
+# VIF values
+car::vif(model2)
+
+
+or_plot <- tidy(model2, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Make labels nicer (edit these replacements to match your exact factor labels)
+    term = str_replace_all(term, c(
+      "RaceEthnicity" = "Race: ",
+      "economic.status" = "Economic status: ",
+      "SpecialEdStatus" = "Special Ed: ",
+      "pseo.participant" = "PSEO: ",
+      "cte.achievement" = "CTE: ",
+      "MCA.R" = "MCA Reading",
+      "MCA.M" = "MCA Math",
+      "Dem_Desc" = "Dem_Desc: ",
+      "Gender" = "Gender: ",
+      "took.ACT" = "Took ACT: "
+    )),
+    # Put most important effects near the top (optional: tweak ordering later)
+    term = fct_reorder(term, estimate)
+  )
+
+ggplot(or_plot, aes(x = estimate, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_vline(xintercept = c(0.5, 0.75, 1.25, 1.5, 2),
+             color = "grey85") +
+  geom_point() +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high),
+    orientation = "y",
+    width = 0.2
+  ) +
+  scale_x_log10(
+    breaks = c(0.5, 0.75, 1, 1.25, 1.5, 2),
+    labels = c("0.5", "0.75", "1.0", "1.25", "1.5", "2.0")
+  ) +
+  theme_line +
+  labs(
+    x = "Odds ratio (log scale)",
+    y = NULL
+  )
+
+
+```
+
+<br>
+
+## **Model 3 — High School Accomplishments and Postsecondary Orientation**
+
+MODEL FIT AND COMPARISON TO PRIOR MODELS
+
+The addition of the accomplishments and postsecondary block produces a dramatic improvement in model fit that dwarfs the contributions of the prior two blocks combined. AIC drops from 37,186 in Model 2 to 36,141 in Model 3 — a reduction of 1,045 points, compared to reductions of 61 points (Model 1 to Model 2) and an implied 61-point baseline from the null model to Model 1. The Nagelkerke R² increases from 0.019 in Model 2 to 0.066 in Model 3. The residual deviance drops by over 1,050 points on just 5 additional degrees of freedom, confirming that the accomplishments and postsecondary variables collectively explain substantially more variation in sustained regional employment than all demographic and contextual variables combined.
+
+The Hosmer-Lemeshow test returns to significance (X²=24.8, df=8, p=.002), indicating some residual miscalibration in Model 3. This is a common outcome in large full-population models where the test has very high statistical power — small deviations from perfect calibration across probability deciles are detectable even when they are substantively trivial. Given the model's substantial improvement in AIC and deviance reduction, the Hosmer-Lemeshow result should be treated as a precision flag rather than evidence of fundamental misspecification. All VIF values remain well below 2.0, confirming that the addition of four new predictors introduces no multicollinearity concern.
+
+The AIC sequence across the three models — 37,247, 37,186, 36,141 — tells the core story of the model comparison: high school context adds a small but real increment, and the accomplishments and postsecondary block adds the overwhelming majority of explanatory value. This formally confirms the bivariate finding that what graduates did in high school and whether they attempted postsecondary education are far more consequential predictors of Year 1 regional labor market attachment than where they went to high school or, to a considerable degree, who they are demographically.
+
+DEMOGRAPHIC VARIABLES — STABILITY IN MODEL 3
+
+The demographic associations from Models 1 and 2 are remarkably stable after adding the accomplishments and postsecondary block. Gender (OR=0.812), SpecialEdStatus (OR=0.729), RaceEthnicityAI (OR=0.464), RaceEthnicityAsian/PI (OR=0.739), and RaceEthnicityBlack (OR=0.490) all remain significant at p\<.001 with odds ratios virtually unchanged from Model 2. Economic status and english.learner remain non-significant. This stability across all three models is a strong confirmatory result: the demographic disadvantages identified in Model 1 are not explained by differential access to CTE, ACT participation, or postsecondary attendance. They represent independent structural barriers to regional labor market attachment that persist even after accounting for the full set of high school and postsecondary experiences available in this analysis.
+
+AVERAGE LOCAL UNEMPLOYMENT RATE
+
+The unemployment rate association strengthens modestly in Model 3 (OR=0.895, compared to OR=0.929 in Model 2), indicating that controlling for accomplishments and postsecondary variables reveals a somewhat larger independent geographic push effect. Graduates from higher-unemployment communities are less likely to achieve sustained regional employment net of their individual preparation and postsecondary experience — the push dynamic operates independently of what graduates did in high school or whether they attended college.
+
+ACT PARTICIPATION
+
+ACT participation shows a small but significant negative association with sustained regional employment at Year 1 in the fully adjusted model (OR=0.910, 95% CI 0.860–0.962, p\<.001). ACT-takers have approximately 9% lower odds of sustained regional employment compared to non-takers after controlling for all other variables. This finding is initially counterintuitive but is consistent with the bivariate analysis interpretation: ACT participation signals broader labor market orientation and mobility that channels non-completers toward out-of-region sustained employment rather than regional attachment. The negative association is small but robust to full multivariate adjustment.
+
+AP EXAM PARTICIPATION
+
+AP exam participation shows the largest negative association in the accomplishments block and one of the largest in the entire model (OR=0.568, 95% CI 0.512–0.629, p\<.001). AP test-takers have 43% lower odds of achieving sustained regional employment at Year 1 compared to non-takers, net of all demographic characteristics, local labor market context, ACT participation, CTE engagement, and postsecondary attendance. This is the college-orientation paradox in its fully adjusted form and it is striking in magnitude. After accounting for every other variable in the model — including whether graduates actually attended postsecondary — AP exam participation itself retains a large and independent negative association with regional labor market attachment. The paradox is not explained by AP test-takers being more likely to attend postsecondary, or by their demographic composition, or by their lower CTE engagement. Something about AP exam participation itself — the orientation, the expectations, the peer networks, or the labor market signaling it produces — is independently associated with reduced probability of regional workforce attachment in the first year after high school.
+
+CTE ACHIEVEMENT
+
+CTE achievement shows a clean and significant dose-response gradient in the fully adjusted model, confirming the bivariate finding as an independent relationship. CTE Concentrators and Completors have 64% higher odds of sustained regional employment compared to No CTE graduates (OR=1.640, 95% CI 1.534–1.753, p\<.001). CTE Participants have 32% higher odds relative to No CTE graduates (OR=1.315, 95% CI 1.222–1.416, p\<.001). Both contrasts are large, precise, and significant at p\<.001. Critically, these associations survive full adjustment for demographic characteristics, local labor market context, ACT participation, AP exam participation, and postsecondary attendance. CTE engagement is an independent predictor of regional labor market attachment — not a proxy for demographic advantage or postsecondary orientation. The gradient from No CTE to Participant to Concentrator/ Completor is the clearest dose-response confirmation in the analysis and the strongest evidence for CTE as a primary mechanism of regional workforce attachment among non-completers.
+
+POSTSECONDARY ATTENDANCE
+
+Postsecondary attendance is the single strongest predictor in Model 3 and the strongest individual predictor in the entire model sequence (OR=2.023, 95% CI 1.917–2.134, p\<.001). Non-completers who attended postsecondary have more than double the odds of achieving sustained regional employment at Year 1 compared to those who never attended, net of all demographic characteristics, local labor market context, and high school accomplishments. This is a large, precise, and robust association. The OR of 2.023 means that postsecondary attendance — even without credential attainment — is associated with a 102% increase in the odds of sustained regional employment in the first year after high school graduation. No other variable in the model approaches this magnitude. Postsecondary attendance is not explained by CTE engagement, ACT participation, demographic advantage, or local labor market conditions. It represents an independent and powerful predictor that likely reflects human capital gains from partial enrollment, expanded employer networks, and strengthened labor market orientation that partial postsecondary experience confers even in the absence of a credential.
+
+SUMMARY
+
+Model 3 delivers the central confirmation of the bivariate analysis. The accomplishments and postsecondary block produces an AIC improvement more than 17 times larger than the high school characteristics block, formally establishing that what graduates did — in high school and in any postsecondary experience — is far more predictive of Year 1 regional labor market attachment than where they went to school or, to a substantial degree, their demographic characteristics alone. Four findings stand out as the most analytically important results of the full model sequence.
+
+First, postsecondary attendance is the dominant independent predictor of sustained regional employment at Year 1, with odds more than double those of non-attenders after full adjustment.
+
+Second, CTE achievement shows a robust dose-response gradient that survives complete multivariate adjustment — the strongest in-school predictor of regional labor market attachment.
+
+Third, the college-orientation paradox is confirmed in its fully adjusted form: AP exam participation retains a large independent negative association with sustained regional employment that is not explained by any other variable in the model.
+
+Fourth, the demographic disadvantages identified in Model 1 — particularly for American Indian and Black graduates and for special education graduates — are not explained by differential access to CTE, ACT participation, or postsecondary experience. They persist as independent structural barriers even in the most fully specified model, pointing toward mechanisms beyond the reach of high school and postsecondary programming alone.
+
+```{r}
+model3 <- glm(
+  grad.year.1 ~
+    Gender + 
+    RaceEthnicity +
+    economic.status +
+    SpecialEdStatus +
+    english.learner +
+    avg.unemp.rate +
+    took.ACT +
+    ap.exam +
+    cte.achievement +
+    attended.ps,
+  family = binomial,
+  data = master.model.1
+)
+
+model3
+
+# Odds ratios with 95% confidence intervals
+exp(cbind(OR = coef(model3), confint(model3)))
+
+# Wald test p-values and full summary
+summary(model3)
+
+# Nagelkerke R²
+pscl::pR2(model3)
+
+# Hosmer-Lemeshow test
+ResourceSelection::hoslem.test(model3$y, fitted(model3))
+
+# VIF values
+car::vif(model3)
+
+or_plot <- tidy(model3, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Make labels nicer (edit these replacements to match your exact factor labels)
+    term = str_replace_all(term, c(
+      "RaceEthnicity" = "Race: ",
+      "economic.status" = "Economic status: ",
+      "SpecialEdStatus" = "Special Ed: ",
+      "pseo.participant" = "PSEO: ",
+      "cte.achievement" = "CTE: ",
+      "MCA.R" = "MCA Reading",
+      "MCA.M" = "MCA Math",
+      "Dem_Desc" = "Dem_Desc: ",
+      "Gender" = "Gender: ",
+      "took.ACT" = "Took ACT: ",
+      "avg.unemp.rate" = "Avg unemp rate",
+      "avg.wages.pct.state" = "Avg wages pct state"
+    )),
+    # Put most important effects near the top (optional: tweak ordering later)
+    term = fct_reorder(term, estimate)
+  )
+
+ggplot(or_plot, aes(x = estimate, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_vline(xintercept = c(0.5, 0.75, 1.25, 1.5, 2),
+             color = "grey85") +
+  geom_point() +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high),
+    orientation = "y",
+    width = 0.2
+  ) +
+  scale_x_log10(
+    breaks = c(0.5, 0.75, 1, 1.25, 1.5, 2),
+    labels = c("0.5", "0.75", "1.0", "1.25", "1.5", "2.0")
+  ) +
+  theme_line +
+  labs(
+    x = "Odds ratio (log scale)",
+    y = NULL
+  )
+
+
+```
+
+<br>
+
+# Modeling - `grad.year.5`
+
+## **Model 1 — Demographic Characteristics (Baseline), Year 5**
+
+MODEL FIT
+
+Model 1 at Year 5 produces fit statistics closely comparable to Year 1 (Nagelkerke R²=0.020, AIC=45,784). The demographic block alone explains a similarly modest share of variation in sustained regional employment five years after graduation as it did at Year 1. The Hosmer-Lemeshow test flags modest miscalibration (X²=13.1, df=5, p=.022), consistent with the Year 1 Model 1 result and attributable to the large sample size and the demographics-only specification. All VIF values are well below 2.0, confirming no multicollinearity concern.
+
+GENDER
+
+The male advantage in sustained regional employment persists at Year 5 with essentially unchanged magnitude. Female non- completers have 18% lower odds of sustained regional employment compared to male non-completers, net of all other demographic characteristics (OR=0.823, 95% CI 0.787–0.861, p\<.001). The stability of this association from Year 1 (OR=0.803) to Year 5 (OR=0.823) confirms the bivariate finding that the gender gap in regional labor market attachment is a durable structural feature of the non-completer population, not a transitional phenomenon that resolves as graduates age into their careers.
+
+RACE AND ETHNICITY
+
+The racial and ethnic associations show meaningful evolution from Year 1 to Year 5, with two notable developments.
+
+Black graduates show the largest negative association at Year 5 (OR=0.447, 95% CI 0.393–0.506, p\<.001), a strengthening from Year 1 (OR=0.490). Black non-completers have less than half the odds of sustained regional employment compared to White graduates at Year 5, net of all other demographic characteristics, and this disadvantage deepens over the five-year window. This is consistent with the bivariate finding of a persistent and growing other-disconnected employment concentration among Black non-completers that does not resolve over time.
+
+American Indian graduates show lower odds at Year 5 (OR=0.504, 95% CI 0.359–0.692, p\<.001), modestly attenuated from Year 1 (OR=0.444). The small group size (n=212) continues to limit precision, but the direction and practical magnitude remain large.
+
+Asian/Pacific Islander graduates show a moderate negative association (OR=0.703, 95% CI 0.606–0.813, p\<.001), essentially unchanged from Year 1 (OR=0.734).
+
+Hispanic graduates reach statistical significance at Year 5 (OR=0.883, 95% CI 0.803–0.970, p=.010), having been non-significant at Year 1 (p=.158). This emergence of a significant Hispanic disadvantage by Year 5 is consistent with the bivariate finding that Hispanic non-completers show growing no-record concentration over the five-year window — a geographic absence that becomes more pronounced as the observation period extends and is now independently detectable net of economic status and English learner status.
+
+ECONOMIC STATUS
+
+Economic status remains non-significant at Year 5 (OR=0.978, p=.355), consistent with Year 1. The pattern of economic disadvantage operating through its correlation with other demographic characteristics rather than as an independent predictor continues to hold at the five-year time point.
+
+SPECIAL EDUCATION STATUS
+
+Special education status retains a significant independent negative association at Year 5 (OR=0.801, 95% CI 0.755–0.849, p\<.001), but the magnitude has attenuated from Year 1 (OR=0.706). Special education non-completers still have 20% lower odds of sustained regional employment than non-special education graduates at Year 5, net of all other demographic characteristics, but the gap has narrowed. This is consistent with the bivariate finding that the special education association was somewhat stable but shows modest compression over the five-year window as a subset of special education graduates establish regional labor market attachment over time.
+
+ENGLISH LEARNER STATUS
+
+The most analytically important development in Year 5 Model 1 is the emergence of a significant independent association for english.learner status. At Year 1, english.learner was non-significant (OR=0.962, p=.430) after controlling for race and ethnicity. At Year 5 it is significant and meaningful (OR=0.767, 95% CI 0.702–0.837, p\<.001). English learner non-completers have 23% lower odds of sustained regional employment at Year 5, net of racial and ethnic group membership, economic status, special education status, and gender.
+
+This is a critical multivariate finding that extends and deepens the bivariate interpretation. At Year 1, the english.learner disadvantage was fully explained by racial and ethnic group composition — English learners were disadvantaged because of who they are racially and ethnically, not because of language minority status per se. By Year 5, language minority status has developed an independent association that operates above and beyond racial and ethnic group membership. This temporal emergence is consistent with the bivariate finding that the english.learner no-record rate grows from 37.9% at Year 1 to 41.2% at Year 5 — a deepening geographic absence that accumulates over time and becomes independently detectable in the multivariate model only after the full five-year window has elapsed. English learner status is not simply a demographic marker at Year 5 — it represents an independent structural barrier to regional labor market attachment that compounds with time.
+
+SUMMARY
+
+Year 5 Model 1 confirms the Year 1 demographic findings while revealing two important temporal developments. The gender, race/ethnicity, and special education associations are directionally stable, though special education attenuates modestly and Black non-completer disadvantage deepens. The two most significant developments are the emergence of a significant Hispanic disadvantage and, most importantly, the emergence of english.learner as an independent significant predictor — a finding that was not present at Year 1. Together, these developments are consistent with the bivariate interpretation of accumulating geographic absence among language minority and Hispanic non-completers that deepens over the five-year window and becomes independently detectable net of racial and ethnic group membership only with the passage of time.
+
+```{r}
+model1 <- glm(
+  grad.year.5 ~
+    Gender + 
+    RaceEthnicity +
+    economic.status +
+    SpecialEdStatus +
+    english.learner,
+  family = binomial,
+  data = master.model.5
+)
+
+model1
+
+# Odds ratios with 95% confidence intervals
+exp(cbind(OR = coef(model1), confint(model1)))
+
+# Wald test p-values and full summary
+summary(model1)
+
+# Nagelkerke R²
+pscl::pR2(model1)
+
+# Hosmer-Lemeshow test
+ResourceSelection::hoslem.test(model1$y, fitted(model1))
+
+# VIF values
+car::vif(model1)
+
+or_plot <- tidy(model1, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Make labels nicer (edit these replacements to match your exact factor labels)
+    term = str_replace_all(term, c(
+      "RaceEthnicity" = "Race: ",
+      "economic.status" = "Economic status: ",
+      "Gender" = "Gender: ",
+      "SpecialEdStatus" = "Special Ed: ",
+      "Dem_Desc" = "Dem_Desc: "
+    )),
+    # Put most important effects near the top (optional: tweak ordering later)
+    term = fct_reorder(term, estimate)
+  )
+
+ggplot(or_plot, aes(x = estimate, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_vline(xintercept = c(0.5, 0.75, 1.25, 1.5, 2),
+             color = "grey85") +
+  geom_point() +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high),
+    orientation = "y",
+    width = 0.2
+  ) +
+  scale_x_log10(
+    breaks = c(0.5, 0.75, 1, 1.25, 1.5, 2),
+    labels = c("0.5", "0.75", "1.0", "1.25", "1.5", "2.0")
+  ) +
+  theme_line +
+  labs(
+    x = "Odds ratio (log scale)",
+    y = NULL
+  )
+
+
+
+```
+
+<br>
+
+## **Model 2 — High School Characteristics and Local Labor Market, Year 5**
+
+MODEL FIT AND COMPARISON TO MODEL 1
+
+Adding average local unemployment rate to the demographic block produces a minimal improvement in model fit at Year 5. AIC decreases from 45,784 in Model 1 to 45,773 in Model 2 — a reduction of only 11 points, compared to the 61-point reduction observed at Year 1. The Nagelkerke R² increases negligibly from 0.020 to 0.021. The Hosmer-Lemeshow test improves to acceptable calibration (X²=12.5, df=8, p=.130), consistent with the Year 1 Model 2 pattern. All VIF values remain well below 2.0.
+
+The substantially smaller AIC improvement at Year 5 compared to Year 1 is an analytically important finding in its own right. At Year 1, local unemployment rate produced a 61-point AIC reduction, reflecting a meaningful geographic sorting effect at the immediate point of labor market entry — graduates from higher-unemployment communities were pushed toward out- of-region employment from the outset. By Year 5, that same variable produces only an 11-point improvement, indicating that the geographic push effect of local unemployment rate attenuates substantially as a predictor of sustained regional employment over time. Non-completers' labor market attachment at Year 5 is increasingly determined by individual characteristics and experiences rather than by the local economic conditions of the community where they attended high school. This is consistent with the bivariate finding that high school context variables showed only weak and inconsistent associations with refined workforce outcomes in later years.
+
+DEMOGRAPHIC VARIABLES — STABILITY
+
+All demographic associations from Year 5 Model 1 are fully stable in Model 2. Odds ratios shift by no more than 0.01 for any variable, and significance patterns are unchanged. The emergence of english.learner as a significant independent predictor at Year 5 — the key development from Year 1 to Year 5 Model 1 — is fully retained in Model 2 (OR=0.756, p\<.001). The demographic block is not confounded by local labor market context at either time point.
+
+AVERAGE LOCAL UNEMPLOYMENT RATE
+
+Average local unemployment rate retains a significant negative association with sustained regional employment at Year 5 (OR=0.971, 95% CI 0.955–0.987, p\<.001), but the magnitude has attenuated substantially from Year 1 (OR=0.929). Each one-percentage-point increase in average local unemployment rate is now associated with approximately 3% lower odds of sustained regional employment, compared to approximately 7% at Year 1. The direction of the association is unchanged — higher local unemployment continues to push graduates away from regional labor market attachment — but its magnitude has more than halved over the five-year window. This attenuation is consistent with the interpretation that the labor market push effect of local unemployment is strongest at the immediate point of labor market entry, when graduates are most sensitive to local economic conditions, and diminishes as non- completers establish more stable long-term labor market relationships that are less contingent on their community of origin.
+
+SUMMARY
+
+Year 5 Model 2 confirms that average local unemployment rate retains an independent association with sustained regional employment at five years, but its practical contribution has diminished substantially from Year 1. The AIC improvement of only 11 points — compared to 61 points at Year 1 — formally establishes that high school context is a weaker predictor of Year 5 outcomes than Year 1 outcomes, consistent with the bivariate finding that place-based factors have their strongest influence at the point of labor market entry and attenuate as individual characteristics increasingly dominate the determination of long-term workforce trajectories. The demographic associations remain fully stable, and the stage is set for Model 3 to test whether the accomplishments and postsecondary block produces a similarly large improvement at Year 5 as it did at Year 1.
+
+```{r}
+model2 <- glm(
+  grad.year.5 ~
+    Gender + 
+    RaceEthnicity +
+    economic.status +
+    SpecialEdStatus +
+    english.learner +
+    avg.unemp.rate,
+  family = binomial,
+  data = master.model.5
+)
+
+model2
+
+# Odds ratios with 95% confidence intervals
+exp(cbind(OR = coef(model2), confint(model2)))
+
+# Wald test p-values and full summary
+summary(model2)
+
+# Nagelkerke R²
+pscl::pR2(model2)
+
+# Hosmer-Lemeshow test
+ResourceSelection::hoslem.test(model2$y, fitted(model2))
+
+# VIF values
+car::vif(model2)
+
+
+or_plot <- tidy(model2, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Make labels nicer (edit these replacements to match your exact factor labels)
+    term = str_replace_all(term, c(
+      "RaceEthnicity" = "Race: ",
+      "economic.status" = "Economic status: ",
+      "SpecialEdStatus" = "Special Ed: ",
+      "pseo.participant" = "PSEO: ",
+      "cte.achievement" = "CTE: ",
+      "MCA.R" = "MCA Reading",
+      "MCA.M" = "MCA Math",
+      "Dem_Desc" = "Dem_Desc: ",
+      "Gender" = "Gender: ",
+      "took.ACT" = "Took ACT: "
+    )),
+    # Put most important effects near the top (optional: tweak ordering later)
+    term = fct_reorder(term, estimate)
+  )
+
+ggplot(or_plot, aes(x = estimate, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_vline(xintercept = c(0.5, 0.75, 1.25, 1.5, 2),
+             color = "grey85") +
+  geom_point() +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high),
+    orientation = "y",
+    width = 0.2
+  ) +
+  scale_x_log10(
+    breaks = c(0.5, 0.75, 1, 1.25, 1.5, 2),
+    labels = c("0.5", "0.75", "1.0", "1.25", "1.5", "2.0")
+  ) +
+  theme_line +
+  labs(
+    x = "Odds ratio (log scale)",
+    y = NULL
+  )
+
+
+```
+
+<br>
+
+## **Model 3 — High School Accomplishments and Postsecondary Orientation, Year 5**
+
+MODEL FIT AND COMPARISON TO PRIOR MODELS
+
+The accomplishments and postsecondary block again produces the dominant improvement in model fit at Year 5, confirming the pattern established at Year 1. AIC drops from 45,773 in Model 2 to 44,998 in Model 3 — a reduction of 775 points, compared to reductions of 11 points (Model 1 to Model 2) and 519 points from null to Model 1. The Nagelkerke R² increases from 0.021 in Model 2 to 0.049 in Model 3. The accomplishments and postsecondary block accounts for the overwhelming majority of explanatory value in the Year 5 model sequence, formally confirming the bivariate finding that high school accomplishments and postsecondary experience are more consequential predictors of sustained regional employment than place-based context or demographic characteristics alone — and that this holds five years out, not just at the point of initial labor market entry.
+
+The AIC improvement from Model 2 to Model 3 is smaller at Year 5 (775 points) than at Year 1 (1,045 points), while the Nagelkerke R² improvement is also smaller (0.028 vs. 0.047). This attenuation in the explanatory power of the accomplishments and postsecondary block from Year 1 to Year 5 is expected and interpretively meaningful: as non-completers age into their careers, the high school and postsecondary experiences that strongly sorted them at the point of labor market entry become somewhat less determinative of their current workforce status, as accumulated work experience, network development, and individual labor market navigation play growing roles.
+
+The Hosmer-Lemeshow test flags significant miscalibration at Year 5 Model 3 (X²=45.6, df=8, p\<.001), more pronounced than at Year 1 (p=.002). This likely reflects the greater heterogeneity in the Year 5 population — by five years out, non-completers have had more time to diverge into distinct labor market trajectories that the model's linear combination of predictors struggles to fully capture across all probability deciles. Given the large sample size and the model's substantial AIC and deviance improvements, this is best interpreted as a precision limitation rather than evidence of fundamental misspecification. The directional findings remain interpretively sound.
+
+DEMOGRAPHIC VARIABLES — CONTINUED STABILITY WITH ONE NOTABLE CHANGE
+
+Most demographic associations are stable from Year 5 Model 2 to Model 3, confirming their independence from high school accomplishments and postsecondary experience. Gender (OR=0.858), SpecialEdStatus (OR=0.812), RaceEthnicityAI (OR=0.541), RaceEthnicityAsian/PI (OR=0.744), and RaceEthnicityBlack (OR=0.440) all retain significant negative associations. Economic status remains non-significant. English learner status retains its significant independent association (OR=0.771, p\<.001), confirming that the Year 5 emergence of english.learner as an independent predictor is not explained by differential CTE engagement, postsecondary attendance, or ACT participation among English learner non-completers.
+
+The one notable development is RaceEthnicityHispanic, which was significant in Year 5 Models 1 and 2 (p=.010 and p=.012 respectively) but returns to marginal non-significance in Model 3 (OR=0.921, p=.091). This suggests that a portion of the Hispanic disadvantage in sustained regional employment at Year 5 is explained by differential patterns of ACT participation, CTE engagement, and postsecondary attendance among Hispanic non-completers — the association attenuates when these variables are controlled, unlike the Black and American Indian associations which remain fully stable. This is an important multivariate clarification: the Hispanic disadvantage in Year 5 sustained regional employment is partially but not fully mediated through high school and postsecondary experiences, in contrast to the Black and American Indian disadvantages which operate through mechanisms beyond the reach of these variables.
+
+AVERAGE LOCAL UNEMPLOYMENT RATE
+
+The unemployment rate association strengthens slightly in Model 3 relative to Model 2 (OR=0.954 vs. OR=0.971), consistent with the Year 1 pattern. The geographic push effect operates independently of accomplishments and postsecondary experience at Year 5, though its magnitude remains modest — each one-percentage-point increase in local unemployment is associated with approximately 5% lower odds of sustained regional employment, compared to 3% in Model 2 and 7% in Year 1 Model 3.
+
+ACT PARTICIPATION
+
+ACT participation retains a small but significant negative association with sustained regional employment at Year 5 (OR=0.909, 95% CI 0.864–0.956, p\<.001), essentially identical in magnitude to Year 1 (OR=0.910). The stability of this small negative association across both time points confirms the bivariate interpretation: ACT participation signals labor market orientation and mobility that consistently channels non-completers toward out-of-region sustained employment rather than regional attachment, and this effect is stable over five years.
+
+AP EXAM PARTICIPATION
+
+The AP exam college-orientation paradox persists at Year 5 but attenuates in magnitude. AP test-takers have 34% lower odds of sustained regional employment compared to non-takers at Year 5 (OR=0.664, 95% CI 0.611–0.721, p\<.001), compared to 43% lower odds at Year 1 (OR=0.568). The paradox is robust — it survives full multivariate adjustment at both time points — but it weakens over the five-year window. This is consistent with the bivariate finding that the AP exam association with sustained regional employment gaps narrows somewhat from Year 1 to Year 5 as a subset of AP test-takers eventually establish regional labor market attachment. The college-orientation paradox is not a permanent condition for all AP participants — some resolve into regional employment over time — but it remains a large and significant independent association at five years out.
+
+CTE ACHIEVEMENT
+
+CTE achievement strengthens from Year 1 to Year 5 in both levels of the dose-response gradient, making it the only accomplishments variable to grow in association magnitude over the five-year window. CTE Concentrators and Completors have 74% higher odds of sustained regional employment compared to No CTE graduates at Year 5 (OR=1.738, 95% CI 1.642–1.841, p\<.001), up from 64% at Year 1 (OR=1.640). CTE Participants show 44% higher odds (OR=1.440, 95% CI 1.354–1.532, p\<.001), up from 32% at Year 1 (OR=1.315). Both gradients strengthen, and the gap between Concentrators and Participants widens — the dose-response structure becomes more pronounced with time, not less. This is the single most important finding in Model 3 at Year 5: CTE engagement is not merely a labor market entry advantage that fades as careers develop. It is a compounding advantage that grows stronger as the observation window extends. Five years out, deeper CTE engagement in high school is more strongly associated with sustained regional employment than it was at the point of initial labor market entry. CTE is the primary mechanism of durable regional workforce attachment among non-completers.
+
+POSTSECONDARY ATTENDANCE
+
+Postsecondary attendance remains the strongest single predictor in Model 3 at Year 5 by coefficient magnitude, but its association has attenuated substantially from Year 1. Non-completers who attended postsecondary have 45% higher odds of sustained regional employment at Year 5 compared to non-attenders (OR=1.451, 95% CI 1.385–1.521, p\<.001), compared to 102% higher odds at Year 1 (OR=2.023). The attenuation from OR=2.023 to OR=1.451 is large — the postsecondary attendance advantage has roughly halved in magnitude over five years. This is fully consistent with the bivariate finding that the attended.ps Cramer's V declined from 0.195 at Year 1 to 0.114 at Year 5, reflecting the convergence dynamic in which non- attenders who eventually establish regional employment close the gap from below while some attenders who do not sustain attachment accumulate into no-record status from above. Postsecondary attendance remains a powerful and significant independent predictor at Year 5, but its dominance relative to CTE achievement has diminished: the ratio of the attended.ps OR to the CTE Concentrator OR narrows from 1.23 at Year 1 (2.023 vs. 1.640) to 0.83 at Year 5 (1.451 vs. 1.738). By Year 5, CTE achievement — not postsecondary attendance — is the stronger predictor of sustained regional employment. This reversal is the most analytically important finding in the Year 5 model sequence.
+
+SUMMARY
+
+Year 5 Model 3 delivers four confirmatory findings that extend and deepen the Year 1 results.
+
+First, the accomplishments and postsecondary block remains the dominant explanatory block at Year 5, producing an AIC improvement more than 70 times larger than the high school characteristics block, confirming that what graduates did matters far more than where they went to school — and that this holds five years out.
+
+Second, the college-orientation paradox is confirmed at Year 5 in fully adjusted form: AP exam participation retains a large independent negative association with sustained regional employment that attenuates but does not disappear over five years.
+
+Third, and most importantly, CTE achievement strengthens while postsecondary attendance attenuates — producing a reversal in which CTE is the stronger independent predictor of sustained regional employment at Year 5. CTE engagement is a compounding advantage; postsecondary attendance is a strong but attenuating one.
+
+Fourth, the demographic disadvantages for Black, American Indian, Asian/PI, special education, and English learner non-completers persist as independent structural barriers in the fully specified model, unchanged by the addition of accomplishments and postsecondary variables — confirming that these disadvantages operate through mechanisms beyond the reach of high school and postsecondary programming alone.
+
+```{r}
+model3 <- glm(
+  grad.year.5 ~
+    Gender + 
+    RaceEthnicity +
+    economic.status +
+    SpecialEdStatus +
+    english.learner +
+    avg.unemp.rate +
+    took.ACT +
+    ap.exam +
+    cte.achievement +
+    attended.ps,
+  family = binomial,
+  data = master.model.5
+)
+
+model3
+
+# Odds ratios with 95% confidence intervals
+exp(cbind(OR = coef(model3), confint(model3)))
+
+# Wald test p-values and full summary
+summary(model3)
+
+# Nagelkerke R²
+pscl::pR2(model3)
+
+# Hosmer-Lemeshow test
+ResourceSelection::hoslem.test(model3$y, fitted(model3))
+
+# VIF values
+car::vif(model3)
+
+or_plot <- tidy(model3, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Make labels nicer (edit these replacements to match your exact factor labels)
+    term = str_replace_all(term, c(
+      "RaceEthnicity" = "Race: ",
+      "economic.status" = "Economic status: ",
+      "SpecialEdStatus" = "Special Ed: ",
+      "pseo.participant" = "PSEO: ",
+      "cte.achievement" = "CTE: ",
+      "MCA.R" = "MCA Reading",
+      "MCA.M" = "MCA Math",
+      "Dem_Desc" = "Dem_Desc: ",
+      "Gender" = "Gender: ",
+      "took.ACT" = "Took ACT: ",
+      "avg.unemp.rate" = "Avg unemp rate",
+      "avg.wages.pct.state" = "Avg wages pct state"
+    )),
+    # Put most important effects near the top (optional: tweak ordering later)
+    term = fct_reorder(term, estimate)
+  )
+
+ggplot(or_plot, aes(x = estimate, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_vline(xintercept = c(0.5, 0.75, 1.25, 1.5, 2),
+             color = "grey85") +
+  geom_point() +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high),
+    orientation = "y",
+    width = 0.2
+  ) +
+  scale_x_log10(
+    breaks = c(0.5, 0.75, 1, 1.25, 1.5, 2),
+    labels = c("0.5", "0.75", "1.0", "1.25", "1.5", "2.0")
+  ) +
+  theme_line +
+  labs(
+    x = "Odds ratio (log scale)",
+    y = NULL
+  )
+
+
+```
+
+<br>
+
+# Modeling - `grad.year.10`
+
+## **Model 1 — Demographic Characteristics (Baseline), Year 10**
+
+MODEL FIT
+
+Year 10 Model 1 produces fit statistics comparable to prior time points (Nagelkerke R²=0.016, AIC=27,471). The demographic block alone explains a similarly modest share of variation in sustained regional employment at ten years as it did at Years 1 and 5, confirming that demographic characteristics establish a structural baseline that is meaningful but far from determinative across the full ten-year trajectory. The Hosmer-Lemeshow test is acceptable (X²=8.2, df=4, p=.086), indicating adequate calibration. All VIF values are well below 2.0, confirming no multicollinearity concern.
+
+GENDER
+
+The male advantage in sustained regional employment persists at Year 10 with essentially unchanged magnitude from Years 1 and 5. Female non-completers have 19% lower odds of sustained regional employment compared to male non-completers, net of all other demographic characteristics (OR=0.807, 95% CI 0.762–0.856, p\<.001). The consistency of this association across all three time points — OR=0.803 at Year 1, OR=0.823 at Year 5, OR=0.807 at Year 10 — confirms the gender gap in regional labor market attachment as one of the most structurally stable findings in the entire analysis. It is established at labor market entry and does not resolve over a decade.
+
+RACE AND ETHNICITY
+
+The racial and ethnic associations at Year 10 show continued evolution from the Year 5 pattern, with the most important development being the full disappearance of the Hispanic association.
+
+Black graduates retain the largest negative association among racial and ethnic groups at Year 10 (OR=0.478, 95% CI 0.398–0.570, p\<.001), essentially unchanged from Year 5 (OR=0.440). The Black non-completer disadvantage in sustained regional employment is the most durable racial and ethnic finding in the analysis — large, significant, and stable across all three time points. Ten years after high school graduation, Black non-completers have less than half the odds of sustained regional employment compared to White graduates, net of all other demographic characteristics.
+
+American Indian graduates retain a large negative association (OR=0.470, 95% CI 0.289–0.732, p=.001), though the widening confidence interval at Year 10 reflects the reduced sample size of this already small group and warrants continued interpretive caution. The point estimate is consistent with prior time points.
+
+Asian/Pacific Islander graduates show a strengthening negative association at Year 10 (OR=0.652, 95% CI 0.532–0.794, p\<.001), larger than at Year 5 (OR=0.744). This deepening disadvantage over ten years is consistent with the bivariate finding of growing no-record concentration among Asian/PI non- completers across the observation window.
+
+Hispanic graduates show no significant association at Year 10 (OR=0.959, p=.526), consistent with Year 1 and in contrast to the significant association at Year 5. The Hispanic association at Year 5 appears to have been a transitional phenomenon — a period of elevated geographic absence that diminishes as Hispanic non-completers increasingly establish regional labor market attachment by the ten-year mark. This is an interpretively important finding: of all minority groups, Hispanic non-completers show the most time-variant pattern, moving from non-significant disadvantage at Year 1 to significant disadvantage at Year 5 and back to non-significance at Year 10.
+
+ECONOMIC STATUS
+
+Economic status produces a non-significant positive point estimate at Year 10 (OR=1.020, p=.536) — the first positive coefficient for this variable across any model at any time point. This sign reversal, while non-significant, suggests that the economic disadvantage in sustained regional employment that was directionally consistent but non-significant at Years 1 and 5 has fully dissipated by ten years. Low-income non-completers who remain engaged with the regional labor market over a decade appear to achieve sustained regional employment at rates comparable to their non-low-income peers. Economic disadvantage influences early-career labor market trajectories through its correlation with other demographic characteristics, but it does not produce a durable independent barrier to sustained regional employment over the ten-year window.
+
+SPECIAL EDUCATION STATUS
+
+Special education status retains a significant negative association at Year 10 but has attenuated substantially across the three time points (OR=0.706 at Year 1, OR=0.801 at Year 5, OR=0.891 at Year 10, p=.003). Special education non-completers still have 11% lower odds of sustained regional employment than non-special education graduates at Year 10, net of all other demographic characteristics, but the gap has compressed from a large effect at labor market entry to a small but persistent one at ten years. This trajectory suggests two things simultaneously: a subset of special education non-completers do eventually establish sustained regional employment over the decade, narrowing the gap from below, but a persistent structural barrier remains that does not fully resolve even after ten years. Special education status is the only demographic variable that shows a clear and consistent attenuation trajectory across all three time points while retaining statistical significance throughout.
+
+ENGLISH LEARNER STATUS
+
+English learner status shows its strongest and most precisely estimated independent association at Year 10 (OR=0.657, 95% CI 0.571–0.755, p\<.001), continuing the trajectory of strengthening independent association from non-significance at Year 1 to OR=0.771 at Year 5 to OR=0.657 at Year 10. English learner non-completers have 34% lower odds of sustained regional employment at Year 10 compared to non-English learners, net of racial and ethnic group membership, economic status, special education status, and gender. This is the largest english.learner association in the model sequence and the clearest expression of the deepening geographic absence signature identified in the bivariate analysis. The ten-year trajectory — from non-significant at Year 1 to large and significant at Year 10 — tells a coherent story: language minority barriers to regional labor market attachment are not immediate sorting effects that operate at the point of entry. They are slow- accumulating structural disadvantages that compound with time and become increasingly detectable as independent associations net of racial and ethnic group membership only after the full decade has elapsed. English learner status is, by Year 10, one of the strongest demographic predictors of sustained regional employment in the model.
+
+SUMMARY
+
+Year 10 Model 1 reveals the long-run demographic structure of sustained regional employment among non-completers and produces three findings that extend the year-by-year pattern in analytically important ways. First, gender remains the most temporally stable demographic predictor — present, significant, and essentially unchanged in magnitude across the full decade. Second, the racial and ethnic disadvantages for Black and American Indian non-completers are permanent structural features that do not attenuate over ten years, while the Hispanic disadvantage is time-variant and resolves by Year 10. Third, english.learner status emerges as the strongest growing demographic predictor, strengthening consistently from non-significance at Year 1 to a large independent association at Year 10, while special education status follows the opposite trajectory — large and immediate at Year 1 but attenuating toward a small residual effect by Year 10. Together, these trajectories reveal that the demographic barriers to sustained regional employment are not uniform in their temporal character: some are established at entry and stable, some are established at entry and attenuate, and some accumulate and deepen over time.
+
+```{r}
+model1 <- glm(
+  grad.year.10 ~
+    Gender + 
+    RaceEthnicity +
+    economic.status +
+    SpecialEdStatus +
+    english.learner,
+  family = binomial,
+  data = master.model.10
+)
+
+model1
+
+# Odds ratios with 95% confidence intervals
+exp(cbind(OR = coef(model1), confint(model1)))
+
+# Wald test p-values and full summary
+summary(model1)
+
+# Nagelkerke R²
+pscl::pR2(model1)
+
+# Hosmer-Lemeshow test
+ResourceSelection::hoslem.test(model1$y, fitted(model1))
+
+# VIF values
+car::vif(model1)
+
+or_plot <- tidy(model1, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Make labels nicer (edit these replacements to match your exact factor labels)
+    term = str_replace_all(term, c(
+      "RaceEthnicity" = "Race: ",
+      "economic.status" = "Economic status: ",
+      "Gender" = "Gender: ",
+      "SpecialEdStatus" = "Special Ed: ",
+      "Dem_Desc" = "Dem_Desc: "
+    )),
+    # Put most important effects near the top (optional: tweak ordering later)
+    term = fct_reorder(term, estimate)
+  )
+
+ggplot(or_plot, aes(x = estimate, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_vline(xintercept = c(0.5, 0.75, 1.25, 1.5, 2),
+             color = "grey85") +
+  geom_point() +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high),
+    orientation = "y",
+    width = 0.2
+  ) +
+  scale_x_log10(
+    breaks = c(0.5, 0.75, 1, 1.25, 1.5, 2),
+    labels = c("0.5", "0.75", "1.0", "1.25", "1.5", "2.0")
+  ) +
+  theme_line +
+  labs(
+    x = "Odds ratio (log scale)",
+    y = NULL
+  )
+
+
+
+```
+
+<br>
+
+## **Model 2 — High School Characteristics and Local Labor Market, Year 10**
+
+MODEL FIT AND COMPARISON TO MODEL 1
+
+Adding average local unemployment rate to the demographic block produces a meaningful improvement in model fit at Year 10, reversing the attenuation trend observed from Year 1 to Year 5. AIC decreases from 27,471 in Model 1 to 27,403 in Model 2 — a reduction of 68 points, compared to 11 points at Year 5 and 61 points at Year 1. The Nagelkerke R² increases from 0.016 to 0.020. The Hosmer- Lemeshow test is acceptable (X²=9.4, df=8, p=.311), consistent with Model 2 calibration at prior time points. All VIF values remain well below 2.0.
+
+The re-emergence of a large AIC improvement for avg.unemp.rate at Year 10 — after its near-disappearance at Year 5 — is the most analytically unexpected finding in the Year 10 model sequence to this point and requires careful interpretation. Three explanations are worth considering.
+
+First, the Year 10 analytic sample consists exclusively of the earlier graduation cohorts (approximately 2008– 2015), which experienced the Great Recession and its aftermath during their initial labor market entry years. Graduates from higher-unemployment communities during this period may have faced more persistent structural labor market disadvantage that continues to manifest in their regional employment outcomes a decade later, making local unemployment rate a stronger long-run predictor for these cohorts than it was for the full cross-cohort Year 5 sample.
+
+Second, by ten years out, the graduates who remain in the no-record category or in non-sustained employment despite a decade of potential labor market exposure represent an increasingly selected group of the most persistently disadvantaged — and local labor market conditions at the time of high school graduation may be a more powerful predictor of membership in this persistently disadvantaged group than of membership in the broader Year 5 non-sustained population.
+
+Third, the reduced sample size at Year 10 changes the composition of the analytic population in ways that may amplify the geographic clustering of outcomes, making local unemployment rate a more efficient predictor of the remaining variation.
+
+These explanations are not mutually exclusive, and distinguishing among them is beyond the scope of the bivariate confirmation analysis. The finding is flagged as an unexpected departure from the Year 1 to Year 5 attenuation trend that warrants attention in future analyses.
+
+DEMOGRAPHIC VARIABLES — STABILITY
+
+All demographic associations from Year 10 Model 1 are fully stable in Model 2. Odds ratios shift by no more than 0.01 for any variable, and significance patterns are unchanged. The strengthening english.learner association identified in Model 1 (OR=0.657) is fully retained (OR=0.663, p\<.001), confirming its independence from local labor market context. The non-significant economic.status positive point estimate from Model 1 is also stable (OR=1.032, p=.329), further confirming that economic disadvantage has no independent association with sustained regional employment at ten years in either direction.
+
+AVERAGE LOCAL UNEMPLOYMENT RATE
+
+Average local unemployment rate shows its largest independent association across the three time points at Year 10 (OR=0.894, 95% CI 0.870–0.918, p\<.001). Each one-percentage-point increase in average local unemployment rate is associated with approximately 11% lower odds of sustained regional employment at Year 10, compared to approximately 5% at Year 5 and 7% at Year 1 Model 2. The non-linear trajectory across time points — strong at Year 1, weakest at Year 5, strongest at Year 10 — suggests that local unemployment rate captures two distinct dynamics operating at different time scales: an immediate entry-point sorting effect at Year 1, a diminished transitional effect at Year 5 as graduates establish more individualized labor market trajectories, and a long-run structural effect at Year 10 that reflects the persistent consequences of graduating into a higher-unemployment local economy. For the earlier cohorts that constitute the Year 10 sample, the local labor market conditions at the time of high school graduation appear to have left a lasting imprint on sustained regional employment outcomes a full decade later.
+
+SUMMARY
+
+Year 10 Model 2 produces an unexpected and analytically important finding: the contribution of average local unemployment rate to model fit re-emerges at Year 10 after near-disappearance at Year 5, with the largest OR of any time point. This non-linear temporal pattern suggests that local unemployment rate captures both short-run entry-point sorting and long-run structural disadvantage that are not fully visible at the five-year mark. The demographic associations remain fully stable, and the stage is set for Model 3 to test whether the accomplishments and postsecondary block continues to dominate the model sequence at the ten-year time point and how the CTE versus postsecondary attendance reversal observed at Year 5 develops further over the full decade.
+
+```{r}
+model2 <- glm(
+  grad.year.10 ~
+    Gender + 
+    RaceEthnicity +
+    economic.status +
+    SpecialEdStatus +
+    english.learner +
+    avg.unemp.rate,
+  family = binomial,
+  data = master.model.10
+)
+
+model2
+
+# Odds ratios with 95% confidence intervals
+exp(cbind(OR = coef(model2), confint(model2)))
+
+# Wald test p-values and full summary
+summary(model2)
+
+# Nagelkerke R²
+pscl::pR2(model2)
+
+# Hosmer-Lemeshow test
+ResourceSelection::hoslem.test(model2$y, fitted(model2))
+
+# VIF values
+car::vif(model2)
+
+
+or_plot <- tidy(model2, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Make labels nicer (edit these replacements to match your exact factor labels)
+    term = str_replace_all(term, c(
+      "RaceEthnicity" = "Race: ",
+      "economic.status" = "Economic status: ",
+      "SpecialEdStatus" = "Special Ed: ",
+      "pseo.participant" = "PSEO: ",
+      "cte.achievement" = "CTE: ",
+      "MCA.R" = "MCA Reading",
+      "MCA.M" = "MCA Math",
+      "Dem_Desc" = "Dem_Desc: ",
+      "Gender" = "Gender: ",
+      "took.ACT" = "Took ACT: "
+    )),
+    # Put most important effects near the top (optional: tweak ordering later)
+    term = fct_reorder(term, estimate)
+  )
+
+ggplot(or_plot, aes(x = estimate, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_vline(xintercept = c(0.5, 0.75, 1.25, 1.5, 2),
+             color = "grey85") +
+  geom_point() +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high),
+    orientation = "y",
+    width = 0.2
+  ) +
+  scale_x_log10(
+    breaks = c(0.5, 0.75, 1, 1.25, 1.5, 2),
+    labels = c("0.5", "0.75", "1.0", "1.25", "1.5", "2.0")
+  ) +
+  theme_line +
+  labs(
+    x = "Odds ratio (log scale)",
+    y = NULL
+  )
+
+
+```
+
+<br>
+
+## **Model 3 — High School Accomplishments and Postsecondary Orientation, Year 10**
+
+MODEL FIT AND COMPARISON TO PRIOR MODELS
+
+The accomplishments and postsecondary block again produces the dominant improvement in model fit at Year 10, though its magnitude continues to attenuate across the three time points. AIC drops from 27,403 in Model 2 to 27,048 in Model 3 — a reduction of 355 points, compared to 775 points at Year 5 and 1,045 points at Year 1. The Nagelkerke R² increases from 0.020 in Model 2 to 0.042 in Model 3. The AIC sequence across the three Year 10 models — 27,471, 27,403, 27,048 — mirrors the pattern at Years 1 and 5: high school context adds a real but secondary contribution, and the accomplishments and postsecondary block dominates. The Hosmer-Lemeshow test is non- significant at Year 10 Model 3 (X²=13.0, df=8, p=.112), a notable improvement from the significant miscalibration at Year 5 Model 3 (p\<.001), suggesting that the model specification fits the Year 10 outcome distribution more cleanly than it did at Year 5. All VIF values remain well below 2.0.
+
+The continuing attenuation of the accomplishments and postsecondary block's AIC contribution — from 1,045 at Year 1 to 775 at Year 5 to 355 at Year 10 — documents a systematic and interpretively coherent trajectory. High school and postsecondary experiences are most consequential at the point of labor market entry, when they function as the primary sorting mechanisms for regional workforce attachment. Their explanatory contribution diminishes as accumulated work experience, employer relationships, and individual labor market navigation over the decade increasingly determine current workforce status. Even so, at Year 10 the accomplishments and postsecondary block remains more than five times more explanatory than the high school context block, confirming the primacy of what graduates did over where they went to school across the full ten-year window.
+
+DEMOGRAPHIC VARIABLES — FULL STABILITY ACROSS ALL THREE TIME POINTS
+
+The demographic associations in Year 10 Model 3 are essentially identical to Year 10 Models 1 and 2 for every variable. Gender (OR=0.840), SpecialEdStatus (OR=0.863), RaceEthnicityAI (OR=0.489), RaceEthnicityAsian/PI (OR=0.656), RaceEthnicityBlack (OR=0.452), and english.learner (OR=0.683) all retain their signs, magnitudes, and significance levels unchanged. Economic status and RaceEthnicityHispanic remain non-significant. This complete stability across all three models at Year 10 — and across all three time points — is the strongest possible confirmation that the demographic disadvantages identified in Model 1 operate through mechanisms that are fully independent of high school accomplishments and postsecondary experience. The Black, American Indian, and English learner disadvantages in particular are not explained by differential access to CTE, lower ACT participation, reduced AP exam taking, or lower postsecondary attendance. They represent structural barriers that persist across a decade and across the full model specification.
+
+AVERAGE LOCAL UNEMPLOYMENT RATE
+
+Average local unemployment rate retains a large and significant independent association at Year 10 Model 3 (OR=0.904, 95% CI 0.880–0.929, p\<.001), essentially unchanged from Model 2 (OR=0.894). The geographic push effect of local unemployment operates independently of accomplishments and postsecondary experience at Year 10 — controlling for CTE engagement, ACT participation, AP exam participation, and postsecondary attendance does not diminish the unemployment rate association. Graduates from higher- unemployment communities face lower odds of sustained regional employment a decade later regardless of what they did in high school or whether they attempted postsecondary education. This confirms that the re-emergence of a strong unemployment rate effect at Year 10 reflects a genuine long-run structural labor market consequence of graduating from a higher- unemployment community rather than a proxy for individual preparation differences.
+
+ACT PARTICIPATION
+
+ACT participation shows a strengthening negative association at Year 10 (OR=0.851, 95% CI 0.795–0.912, p\<.001), larger than at Year 5 (OR=0.909) and Year 1 (OR=0.910). The consistent negative association of ACT participation with sustained regional employment — present at all three time points and strengthening over the decade — confirms the labor market mobility interpretation: ACT-takers among non-completers are systematically more likely to seek and achieve sustained employment outside the region, and this tendency strengthens rather than weakens as careers develop. By ten years out, ACT participation is associated with 15% lower odds of sustained regional employment, net of all other variables — the largest ACT effect across the model sequence.
+
+AP EXAM PARTICIPATION
+
+The AP exam college-orientation paradox remains large and significant at Year 10 (OR=0.678, 95% CI 0.606–0.758, p\<.001), continuing the gradual attenuation from Year 1 (OR=0.568) through Year 5 (OR=0.664). AP test-takers have 32% lower odds of sustained regional employment at Year 10 compared to non-takers, net of all other variables. The paradox is fully confirmed across the decade: AP exam participation retains a large, independent, and significant negative association with sustained regional employment at every time point, and it does not fully resolve even after ten years. A subset of AP test-takers may eventually establish regional employment — hence the gradual attenuation — but a substantial and durable college-orientation departure effect persists through Year 10. The AP exam paradox is not a transitional phenomenon. It is a structural feature of the non-completer population's relationship to the regional labor market that compounds college-preparatory signaling with long-run regional departure.
+
+CTE ACHIEVEMENT
+
+CTE achievement remains the strongest high school accomplishments predictor of sustained regional employment at Year 10 and the most stable across the three time points. CTE Concentrators and Completors have 66% higher odds of sustained regional employment compared to No CTE graduates (OR=1.656, 95% CI 1.538–1.784, p\<.001), essentially identical to Year 5 (OR=1.738) and stronger than Year 1 (OR=1.640). CTE Participants have 44% higher odds relative to No CTE graduates (OR=1.442, 95% CI 1.329–1.565, p\<.001), also essentially stable from Year 5 (OR=1.440). The dose-response gradient is fully preserved at Year 10 — the gap between Concentrators and Participants is maintained, and both remain large and highly significant.
+
+The stability of the CTE achievement associations across Year 5 and Year 10 — in contrast to the continued attenuation of the postsecondary attendance association — is the defining finding of the ten-year model. CTE engagement in high school is not an advantage that fades with time or that is superseded by subsequent labor market experience. It is a durable structural foundation for regional workforce attachment that remains equally strong a decade after high school graduation as it was at five years. CTE is the most temporally stable and practically robust predictor in the entire model sequence.
+
+POSTSECONDARY ATTENDANCE
+
+Postsecondary attendance retains a significant positive association with sustained regional employment at Year 10 (OR=1.278, 95% CI 1.202–1.360, p\<.001), but its magnitude has continued to attenuate dramatically across the time points: OR=2.023 at Year 1, OR=1.451 at Year 5, OR=1.278 at Year 10. The postsecondary attendance advantage has compressed from a 102% increase in odds at Year 1 to a 28% increase at Year 10 — a reduction of nearly three-quarters in the magnitude of the association over the decade. Postsecondary attendance remains a significant and meaningful predictor at Year 10, but its dominance relative to CTE achievement has reversed substantially: the CTE Concentrator OR (1.656) is now 30% larger than the attended.ps OR (1.278), compared to the Year 1 reversal point where attended.ps (2.023) exceeded CTE Concentrator (1.640) by 23%. The postsecondary attendance advantage does not disappear — the human capital, networks, and labor market orientation that partial postsecondary experience provides continue to produce measurable benefits a decade later — but they attenuate steadily as CTE's advantages prove more durably tied to the regional labor market specifically.
+
+SUMMARY
+
+Year 10 Model 3 delivers the final and most temporally comprehensive confirmation of the bivariate analysis findings. Five conclusions emerge from the full model sequence across all three time points.
+
+First, the accomplishments and postsecondary block dominates the model sequence at every time point, formally confirming that what graduates did in high school and whether they attempted postsecondary education is the primary determinant of sustained regional employment — more consequential than demographics or place, and durable across a decade.
+
+Second, CTE achievement is the most temporally stable and durable predictor in the analysis. Its dose-response gradient is fully preserved at Year 10 with effect sizes essentially unchanged from Year 5, confirming CTE engagement as the primary structural mechanism of long-run regional workforce attachment among non-completers.
+
+Third, postsecondary attendance attenuates dramatically but does not disappear. The 102% odds advantage at Year 1 compresses to 28% at Year 10, reflecting a convergence dynamic in which the initial postsecondary sorting advantage diminishes over the decade while CTE's advantages prove more durably regional.
+
+Fourth, the college-orientation paradox — AP exam participation's independent negative association with sustained regional employment — is confirmed across all three time points and all three model specifications. It attenuates gradually but persists at Year 10, confirming it as a structural feature of the non-completer population rather than a transitional entry- point effect.
+
+Fifth, the demographic disadvantages for Black, American Indian, English learner, and special education non-completers persist as independent structural barriers across the full decade and across all model specifications. They are not explained by differential high school preparation or postsecondary experience and point toward mechanisms — employer discrimination, geographic labor market segregation, social network differences, systemic barriers — that fall outside the reach of the high school and postsecondary variables available in this analysis.
+
+```{r}
+model3 <- glm(
+  grad.year.10 ~
+    Gender + 
+    RaceEthnicity +
+    economic.status +
+    SpecialEdStatus +
+    english.learner +
+    avg.unemp.rate +
+    took.ACT +
+    ap.exam +
+    cte.achievement +
+    attended.ps,
+  family = binomial,
+  data = master.model.10
+)
+
+model3
+
+# Odds ratios with 95% confidence intervals
+exp(cbind(OR = coef(model3), confint(model3)))
+
+# Wald test p-values and full summary
+summary(model3)
+
+# Nagelkerke R²
+pscl::pR2(model3)
+
+# Hosmer-Lemeshow test
+ResourceSelection::hoslem.test(model3$y, fitted(model3))
+
+# VIF values
+car::vif(model3)
+
+or_plot <- tidy(model3, conf.int = TRUE, exponentiate = TRUE) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    # Make labels nicer (edit these replacements to match your exact factor labels)
+    term = str_replace_all(term, c(
+      "RaceEthnicity" = "Race: ",
+      "economic.status" = "Economic status: ",
+      "SpecialEdStatus" = "Special Ed: ",
+      "pseo.participant" = "PSEO: ",
+      "cte.achievement" = "CTE: ",
+      "MCA.R" = "MCA Reading",
+      "MCA.M" = "MCA Math",
+      "Dem_Desc" = "Dem_Desc: ",
+      "Gender" = "Gender: ",
+      "took.ACT" = "Took ACT: ",
+      "avg.unemp.rate" = "Avg unemp rate",
+      "avg.wages.pct.state" = "Avg wages pct state"
+    )),
+    # Put most important effects near the top (optional: tweak ordering later)
+    term = fct_reorder(term, estimate)
+  )
+
+ggplot(or_plot, aes(x = estimate, y = term)) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_vline(xintercept = c(0.5, 0.75, 1.25, 1.5, 2),
+             color = "grey85") +
+  geom_point() +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high),
+    orientation = "y",
+    width = 0.2
+  ) +
+  scale_x_log10(
+    breaks = c(0.5, 0.75, 1, 1.25, 1.5, 2),
+    labels = c("0.5", "0.75", "1.0", "1.25", "1.5", "2.0")
+  ) +
+  theme_line +
+  labs(
+    x = "Odds ratio (log scale)",
+    y = NULL
+  )
+
+
+```
+
+<br>
+
+# Synthesis
+
+## PART ONE: WHAT THE MODELS CONFIRMED
+
+The multivariate confirmation analysis estimated nine logistic regression models — three cumulative blocks at each of three time points — to test whether the strongest bivariate findings retained their direction and magnitude when predictors were examined simultaneously. The answer, across nearly every finding of substance, is yes. The bivariate analysis was not an artifact of variable isolation. The associations it identified are real, independent, and in most cases durable across a decade.
+
+**THE MODEL SEQUENCE TELLS THE SAME STORY AT EVERY TIME POINT**
+
+The AIC improvement sequence is unambiguous and consistent across all three time points:
+
+Year 1: Model 1→2: −61 points \| Model 2→3: −1,045 points Year 5: Model 1→2: −11 points \| Model 2→3: −775 points Year 10: Model 1→2: −68 points \| Model 2→3: −355 points
+
+At every time point, the high school context block (Model 2) adds a secondary contribution, and the accomplishments and postsecondary block (Model 3) adds the overwhelming majority of explanatory value. The ratio of Model 3 improvement to Model 2 improvement is 17:1 at Year 1, 70:1 at Year 5, and 5:1 at Year 10. Place-based high school context never approaches the explanatory contribution of what graduates did in high school and whether they attempted postsecondary education. This is the single most structurally consistent finding across the entire nine-model sequence.
+
+**WHAT WAS CONFIRMED FROM THE BIVARIATE ANALYSIS**
+
+Every major bivariate finding was confirmed in the multivariate framework. Specifically:
+
+CTE achievement shows a robust, significant, dose-response gradient at every time point. The Concentrator/Completor advantage over No CTE ranges from OR=1.640 at Year 1 to OR=1.738 at Year 5 to OR=1.656 at Year 10 — stable, large, and essentially unchanged across the decade. The Participant advantage follows the same pattern. CTE engagement is the most temporally stable predictor in the entire analysis.
+
+Postsecondary attendance is the dominant predictor at Year 1 (OR=2.023) and remains significant through Year 10 (OR=1.278), though it attenuates substantially across the decade. The attenuation is real and interpretively important but does not eliminate the association.
+
+The AP exam college-orientation paradox is confirmed at every time point in fully adjusted form. AP test-takers have significantly lower odds of sustained regional employment at Year 1 (OR=0.568), Year 5 (OR=0.664), and Year 10 (OR=0.678). The paradox attenuates but never resolves.
+
+ACT participation retains a small but consistent negative association across all three time points (OR≈0.909–0.851), strengthening slightly over the decade. The labor market mobility interpretation is confirmed: ACT-takers among non-completers are systematically channeled away from regional attachment.
+
+The racial and ethnic disadvantages for Black and American Indian non-completers are fully stable across all nine models. Black non-completers show OR≈0.440–0.520 at every time point and in every model specification. These associations do not attenuate, are not explained by CTE engagement or postsecondary attendance, and persist across the full decade.
+
+English learner status shows the opposite temporal trajectory — non-significant at Year 1, significant at Year 5 (OR=0.771), and strongest at Year 10 (OR=0.683) — confirming the accumulating geographic absence signature identified in the bivariate analysis as an independent structural barrier that deepens with time.
+
+Special education status shows a consistent attenuation trajectory (OR=0.706 at Year 1, OR=0.801 at Year 5, OR=0.891 at Year 10) — always significant, always negative, but narrowing as a subset of special education graduates establish regional attachment over the decade.
+
+Economic status and English learner status at Year 1 are confirmed as non-independent at the point of entry — their bivariate associations are explained by their correlation with race, ethnicity, and special education status. Economic status remains non-significant across all nine models.
+
+Average local unemployment rate retains independent significance across all three time points with a non-linear trajectory — meaningful at Year 1, minimal at Year 5, and re-emerging strongly at Year 10 — consistent with a combination of immediate entry-point push dynamics and longer-run structural labor market consequences for graduates from higher-unemployment communities.
+
+**WHAT WAS NEW IN THE MULTIVARIATE ANALYSIS**
+
+Three findings emerged from the multivariate framework that the bivariate analysis could not fully reveal.
+
+The CTE versus postsecondary attendance reversal is the most important new finding. At Year 1, postsecondary attendance is the stronger predictor (OR=2.023 vs. CTE Concentrator OR=1.640). By Year 5, CTE achievement surpasses postsecondary attendance (OR=1.738 vs. OR=1.451). By Year 10, the gap widens further (OR=1.656 vs. OR=1.278). The two most powerful protective factors in the analysis trade places over time — postsecondary attendance provides the larger initial advantage while CTE engagement provides the more durable long-run foundation.
+
+The independence of racial and ethnic disadvantages from high school and postsecondary experiences is fully established. The fact that Black, American Indian, and Asian/PI disadvantages survive complete adjustment for CTE achievement, ACT participation, AP exam participation, and postsecondary attendance confirms that these groups face structural barriers beyond the reach of educational programming.
+
+The mediation of the Hispanic disadvantage through accomplishments and postsecondary variables — significant in Models 1 and 2 at Year 5 but not in Model 3 — indicates that the Hispanic non- completer disadvantage in sustained regional employment is partially explained by differential patterns of high school and postsecondary engagement in ways that Black and American Indian disadvantages are not.
+
+## PART TWO: THE STORY THE ANALYSIS TELLS
+
+This is a study about what happens to young people who grow up in Southeast Minnesota, graduate from high school, and do not complete a postsecondary credential. It follows 32,878 of them across a decade. It asks who achieves sustained employment in the region where they grew up — and who does not. The answer is a story about preparation, orientation, structural disadvantage, and time.
+
+**THE FIRST YEAR: SORTING HAPPENS FAST AND IT IS NOT RANDOM**
+
+Within the first year after high school graduation, non- completers sort rapidly into distinct labor market trajectories. By Year 1, only one in four has achieved sustained regional employment. One in four has no Minnesota employment record at all. The sorting is not random — it is structured by a set of forces that are already in place before graduation day.
+
+The most powerful force at Year 1 is postsecondary experience. Non-completers who attempted college — even those who left without a credential — have more than double the odds of sustained regional employment compared to those who never attempted it. Something about the experience of postsecondary enrollment, however brief or incomplete, connects graduates to the regional labor market in ways that non-attendance cannot replicate. Whether it is the human capital from partial coursework, the employer networks built through campus jobs and internships, the credential-adjacent signal that enrollment provides, or simply the self-selection of more labor-market-oriented individuals into attempted enrollment — the effect is large, independent, and immediate.
+
+The second most powerful force at Year 1 is what happened in high school — specifically, whether and how deeply a graduate engaged with career and technical education. CTE Concentrators and Completors enter the regional labor market with 64% higher odds of sustained regional employment than those with no CTE involvement, after controlling for every demographic characteristic, local labor market condition, and other high school experience in the model. This is not a proxy for demographic advantage or academic ability — it survives complete multivariate adjustment. CTE depth is the primary in- school mechanism by which Southeast Minnesota high schools connect their graduates to the regional labor market.
+
+And then there is the paradox. Graduates who took AP exams in high school — who were positioned for college, who signaled academic ambition and college orientation — have 43% lower odds of sustained regional employment at Year 1 than those who did not, after controlling for everything else including whether they actually attended postsecondary. This is not because AP test-takers are less capable. It is because they are oriented away from the regional labor market. They leave — to college, to out-of-region employment, to opportunities that their academic preparation and aspirations connect them to outside Southeast Minnesota. For those who do not complete a credential, this departure comes at a cost to the region that the bivariate and multivariate analyses both document clearly and consistently.
+
+The demographic story at Year 1 establishes the structural baseline that persists across the decade. Male non-completers are more likely to achieve sustained regional employment than female non-completers — a gap driven by the concentration of male non- completers in trades, construction, and manufacturing. Special education graduates face immediately large barriers — nearly 30% lower odds of sustained regional employment at Year 1. Black and American Indian non- completers face the largest racial and ethnic barriers — less than half the odds of White graduates — and these barriers are not explained by any other variable in the model. The place where graduates attended high school — which EDR, which community type, which local wage environment — adds almost nothing to the explanation. This is an individual story, not a geographic one.
+
+**FIVE YEARS OUT: THE LANDSCAPE SHIFTS, THE STRUCTURE HOLDS**
+
+By Year 5, the non-completer population has had time to establish more stable labor market relationships — or to confirm their absence from the regional economy. The overall picture has improved modestly: more graduates have transitioned into sustained regional employment. But the structural forces that sorted them at Year 1 have not dissolved. They have evolved.
+
+The most important development at Year 5 is the reversal of the CTE and postsecondary relationship. Postsecondary attendance remains a strong predictor — 45% higher odds of sustained regional employment — but CTE achievement has overtaken it. CTE Concentrators and Completors now have 74% higher odds compared to No CTE graduates, up from 64% at Year 1. The postsecondary advantage is attenuating as the convergence dynamic takes hold: non-attenders who eventually find regional employment close the gap from below, while some attenders who do not sustain attachment drift toward no-record status from above. Meanwhile, CTE's advantage is growing, not shrinking. Five years out, the graduates most durably attached to the regional labor market are those who went deepest into career and technical education in high school. Postsecondary experience provided the larger initial lift; CTE is providing the more durable foundation.
+
+English learner status tells a different kind of temporal story at Year 5. At Year 1, the English learner disadvantage was fully explained by racial and ethnic group composition — English learners were disadvantaged because of who they were racially and ethnically, not because of language minority status per se. By Year 5, language minority status has developed its own independent association. English learner non-completers have 23% lower odds of sustained regional employment at Year 5, net of race and ethnicity, a gap that is not there at Year 1. The geographic absence that the bivariate analysis identified — the growing no-record concentration among English learner non-completers — has accumulated over five years into an independently detectable structural barrier. These graduates are not failing to find regional employment because of their race or economic status. By Year 5, language minority status itself has become a structural barrier operating through mechanisms that compound with time.
+
+The AP exam paradox persists at Year 5 — 34% lower odds of sustained regional employment for AP test- takers, down from 43% at Year 1. Some AP test-takers have found their way back to regional employment, but a large majority of the effect remains. College- preparatory orientation is still pointing non- completers away from the regional labor market five years later.
+
+The Black non-completer disadvantage does not attenuate. At Year 5, Black non-completers have less than half the odds of sustained regional employment compared to White graduates — essentially unchanged from Year 1, and still not explained by CTE engagement, postsecondary attendance, ACT participation, or any other variable in the model. This is a structural barrier of a different character than the ones that respond to educational programming. Its persistence across both frameworks, both time points, and all model specifications points toward mechanisms — employer discrimination, occupational segregation, geographic barriers, social network disadvantage — that lie outside the reach of the variables measured in this analysis.
+
+**TEN YEARS OUT: WHAT ENDURES AND WHAT RESOLVES**
+
+A decade after high school graduation, the non- completer population has largely sorted into its long-run labor market positions. For many, the trajectory that was visible at Year 1 and Year 5 has become a settled reality. The analysis at Year 10 reveals which forces proved durable and which attenuated — and the answers are instructive.
+
+CTE engagement has proven the most durable predictor in the entire analysis. Ten years out, CTE Concentrators and Completors still have 66% higher odds of sustained regional employment compared to those with no CTE involvement — essentially the same as at Year 5, and stronger than at Year 1. This is remarkable stability. A decade of accumulated work experience, employer relationships, and individual labor market navigation has not diminished the advantage that deeper CTE engagement conferred in high school. CTE prepared graduates for the specific contours of the Southeast Minnesota regional labor market in ways that proved durable across the full ten-year window. It is not an entry-point advantage that fades — it is a structural foundation that holds.
+
+Postsecondary attendance has continued to attenuate. The 102% odds advantage at Year 1 has compressed to 28% at Year 10. The advantage has not disappeared — partial postsecondary experience still confers meaningful long-run benefits — but it is now substantially smaller than CTE's advantage. The story of postsecondary attendance across the decade is one of a powerful initial lift that gradually diminishes as the labor market rewards accumulated experience and vocational preparation more than the residual signal of incomplete college enrollment.
+
+The AP exam paradox persists at Year 10 — 32% lower odds of sustained regional employment for AP test- takers. Ten years after high school, graduates who were positioned for college but did not complete a credential are still less likely to be sustainably employed in the region than those who were never positioned for college at all. Some have found their way back; many have not. The college-orientation paradox is a decade-long structural feature of the non-completer population's relationship to the regional labor market, not a transitional sorting artifact.
+
+English learner status shows the opposite temporal trajectory from most other variables — growing stronger over time rather than attenuating. At Year 10, the independent english.learner disadvantage is at its largest (OR=0.683), its confidence interval at its most precise, its independence from racial and ethnic group membership most fully established. The accumulating geographic absence of English learner non-completers — deepening across fifteen years of observation in the bivariate analysis and across a decade in the multivariate models — is the clearest expression of a structural barrier that time alone does not resolve.
+
+The Black non-completer disadvantage remains fully intact at Year 10. Less than half the odds of sustained regional employment compared to White graduates — unchanged across three time points, three model specifications, and a full decade. No variable in the analysis explains it away. It is not a function of educational preparation, college orientation, vocational engagement, or local labor market conditions. It is a structural reality of the Southeast Minnesota labor market for Black non-completers that persists from first year to tenth year without attenuation.
+
+Special education status tells a more hopeful temporal story — large barriers at Year 1 that narrow steadily across the decade to a small but still-present disadvantage at Year 10. A meaningful subset of special education non- completers do achieve sustained regional employment over time. The barriers are real and immediate, but they are not fully permanent.
+
+## **THE CENTRAL CONCLUSION**
+
+The multivariate confirmation analysis tells a coherent and consequential story about what determines whether a non-college completer in Southeast Minnesota achieves sustained employment in the region. It is not where they went to high school. It is not primarily their demographic background, though demographic disadvantages create real and independent barriers that educational programming alone cannot fully overcome. It is what they did — in high school and in any postsecondary experience they attempted — and the orientation that those experiences produced.
+
+Graduates who went deep into career and technical education entered the regional labor market with a structural advantage that compound across the decade. Graduates who attempted postsecondary education — even without completing a credential — entered with a large initial advantage that attenuated but never disappeared. Graduates who were oriented toward college through AP exam participation entered facing a structural disadvantage in regional attachment that persisted across ten years.
+
+The clearest implication is also the most actionable one: CTE depth is the primary lever available within the high school system for improving the long-run regional workforce attachment of non-completers, and its effects are more durable than any other educational variable in this analysis. Postsecondary attendance — even without completion — provides a powerful initial lift that justifies supported transitions to postsecondary for non-completers who would not otherwise attempt it. And the college-orientation paradox warns that high school programming designed to signal college readiness, without pathways to actual completion or regional employment, may actively accelerate the departure of non-completers from the regional labor market.
+
+The structural disadvantages that remain unexplained — the persistent barriers facing Black non-completers, the accumulating absence of English learner non-completers, the decade-long footprint of local unemployment at graduation — are not failures of the analysis. They are findings. They point toward the limits of what educational programming can accomplish and toward the policy domains — employer practices, community-based outreach, regional economic development, anti-discrimination enforcement — where the remaining work must be done.
