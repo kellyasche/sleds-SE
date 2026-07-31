@@ -32,26 +32,26 @@ The findings provide a roadmap for education and workforce policy, showing how *
 
 **Predictive Modeling Highlights (CART).**
 
--   **Employment CART (Regional vs. comparators at 1/5/10 years):** Models repeatedly surface **CTE engagement**, **regional PS pathways**, and **local labor strength** as anchors; **4-year attainment**, **high ACT/MCA**, and **PSEO** forecast outward mobility; **low readiness**, **limited CTE**, and structural disadvantages predict disconnection.
--   **Postsecondary CART (pre-pruned):** **Highest credential** and **location of graduation** models reached **≈62–64% accuracy**, improving on baselines with small sets of predictors (notably **ACT**, **MCA Reading**, **economic status**, **race/ethnicity**, **PSEO**, and **CTE courses**).
--   **Non-college employment CART:** Discriminates best between **regional stayers vs. statewide movers** (≈67–75% accuracy across horizons), with declining lift when predicting **long-term disconnection** (≈56–62%).
+- **Employment CART (Regional vs. comparators at 1/5/10 years):** Models repeatedly surface **CTE engagement**, **regional PS pathways**, and **local labor strength** as anchors; **4-year attainment**, **high ACT/MCA**, and **PSEO** forecast outward mobility; **low readiness**, **limited CTE**, and structural disadvantages predict disconnection.
+- **Postsecondary CART (pre-pruned):** **Highest credential** and **location of graduation** models reached **≈62–64% accuracy**, improving on baselines with small sets of predictors (notably **ACT**, **MCA Reading**, **economic status**, **race/ethnicity**, **PSEO**, and **CTE courses**).
+- **Non-college employment CART:** Discriminates best between **regional stayers vs. statewide movers** (≈67–75% accuracy across horizons), with declining lift when predicting **long-term disconnection** (≈56–62%).
 
 **Interpretation Over Time.**
 
--   **Year 1:** Early attachment depends on **CTE exposure**, **basic academic readiness** (especially math), and **local demand**; SpecialEd and low readiness elevate disconnection risk.
--   **Year 5:** **Institutional pathways** dominate: **regional PS engagement and sub-baccalaureate completion** anchor locally, while **bachelor’s+** channels mobility.
--   **Year 10:** Patterns stabilize: **CTE and regional PS** remain anchors; **reading proficiency** and **credential level** sort mobility; structural inequities persist.
+- **Year 1:** Early attachment depends on **CTE exposure**, **basic academic readiness** (especially math), and **local demand**; SpecialEd and low readiness elevate disconnection risk.
+- **Year 5:** **Institutional pathways** dominate: **regional PS engagement and sub-baccalaureate completion** anchor locally, while **bachelor’s+** channels mobility.
+- **Year 10:** Patterns stabilize: **CTE and regional PS** remain anchors; **reading proficiency** and **credential level** sort mobility; structural inequities persist.
 
 **Equity Lens.** Low-income and SpecialEd students are **less likely to attend and complete PS** and **more likely to disconnect**, even when controlling for other factors. Racial disparities persist across multiple nodes—enrollment, completion, credential level, and employment location—implying the need for **targeted, multi-stage supports** rather than single-point interventions.
 
 **Policy & Practice Implications.**
 
--   **Scale CTE depth and completion** (concentrator/completor pathways; ensure ≥2–5 course sequences) as a proven anchor, including work-based learning and industry-recognized credentials.
--   **Center 2-year institutions** as regional anchors: strengthen advising, transfer-with-a-plan, and stackable credentials while preserving on-ramps for working learners.
--   **Retention strategies for high achievers/4-year grads:** paid internships, co-ops, research-to-industry bridges, and “return-to-region” fellowships aligned with local sectors.
--   **Close equity gaps:** comprehensive supports for **low-income**, **SpecialEd**, and underrepresented **race/ethnicity** groups across the pipeline (readiness bootcamps, intrusive advising, emergency aid, disability-inclusive WBL, and mentoring).
--   **Strengthen local demand signals:** sector partnerships, wage competitiveness, and clear regional career ladders to reduce outward pull.
--   **Use stackability as mobility insurance:** ensure CTE/2-year pathways include **stackable, credit-bearing** steps that enable upward transfer, not dead ends.
+- **Scale CTE depth and completion** (concentrator/completor pathways; ensure ≥2–5 course sequences) as a proven anchor, including work-based learning and industry-recognized credentials.
+- **Center 2-year institutions** as regional anchors: strengthen advising, transfer-with-a-plan, and stackable credentials while preserving on-ramps for working learners.
+- **Retention strategies for high achievers/4-year grads:** paid internships, co-ops, research-to-industry bridges, and “return-to-region” fellowships aligned with local sectors.
+- **Close equity gaps:** comprehensive supports for **low-income**, **SpecialEd**, and underrepresented **race/ethnicity** groups across the pipeline (readiness bootcamps, intrusive advising, emergency aid, disability-inclusive WBL, and mentoring).
+- **Strengthen local demand signals:** sector partnerships, wage competitiveness, and clear regional career ladders to reduce outward pull.
+- **Use stackability as mobility insurance:** ensure CTE/2-year pathways include **stackable, credit-bearing** steps that enable upward transfer, not dead ends.
 
 **Measures to Monitor.** Track: (1) **CTE concentrator/completor rates** and **≥3-course CTE sequences**; (2) **PS enrollment and completion** by **location**, **sector**, and **credential**; (3) **Regional vs. statewide employment** at 1/5/10 years; (4) **Disconnection rates** by **economic status**, **SpecialEd**, and **race/ethnicity**; (5) **Local wage/unemployment** differentials; (6) **Retention of 4-year completers** via internships and early-career placements.
 
@@ -69,10 +69,10 @@ The findings provide a roadmap for education and workforce policy, showing how *
 
 Across demographics, high school characteristics, accomplishments, and postsecondary experiences, clear themes emerge about what most strongly predicts **meaningful employment in the region** versus disconnection or statewide mobility.
 
--   **Postsecondary experiences** are the strongest predictors overall. Where a student graduates from, whether they graduate, and what credential they earn all have lasting effects on both regional retention and statewide opportunities.
--   **Economic status and special education needs** stand out among demographics as powerful predictors of early disadvantage and disconnection.
--   On the other hand, **career and technical education (CTE)** consistently boosts regional employment, making it a strong anchor to the local workforce.
--   Meanwhile, **academic rigor variables (ACT, AP, MCA scores)** largely point students toward postsecondary enrollment and careers beyond the region, signaling statewide mobility rather than regional attachment. Finally, some variables — particularly language indicators and one-off tests like SAT — show weak or inconsistent predictive value.
+- **Postsecondary experiences** are the strongest predictors overall. Where a student graduates from, whether they graduate, and what credential they earn all have lasting effects on both regional retention and statewide opportunities.
+- **Economic status and special education needs** stand out among demographics as powerful predictors of early disadvantage and disconnection.
+- On the other hand, **career and technical education (CTE)** consistently boosts regional employment, making it a strong anchor to the local workforce.
+- Meanwhile, **academic rigor variables (ACT, AP, MCA scores)** largely point students toward postsecondary enrollment and careers beyond the region, signaling statewide mobility rather than regional attachment. Finally, some variables — particularly language indicators and one-off tests like SAT — show weak or inconsistent predictive value.
 
 ------------------------------------------------------------------------
 
@@ -81,7 +81,7 @@ Across demographics, high school characteristics, accomplishments, and postsecon
 These variables **consistently show strong or moderate effect sizes** and **clear differences in meaningful regional employment**, making them strong candidates for modeling.
 
 | Variable | Type | Key Insights |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | ps.grad.location | Postsecondary | Strongest predictor of regional employment. Local PS grads most likely to stay; out-of-region grads more mobile/disconnected. |
 | ps.grad | Postsecondary | Graduation itself reduces disconnection and improves both regional and statewide employment. |
 | highest.cred.level | Postsecondary | Sub-baccalaureate grads anchor regionally; higher credentials = statewide mobility. |
@@ -99,7 +99,7 @@ These variables **consistently show strong or moderate effect sizes** and **clea
 These variables show **moderate associations** with outcomes. They may be useful in modeling, particularly when combined with other predictors.
 
 | Variable | Type | Key Insights |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | RaceEthnicity | Demographic | Persistent disparities: Black, AI, and Hispanic students more disconnected; Asian students more PS-enrolled/out-of-region. |
 | Gender | Demographic | Early gap: males more regionally employed, females more PS-attending. Gaps narrow over time. |
 | Grad.year.covid | Demographic | Post-COVID grads slightly more disconnected and more likely in local work early on. |
@@ -115,7 +115,7 @@ These variables show **moderate associations** with outcomes. They may be useful
 These variables showed **very weak associations** and could be considered for **dropping from modeling**, unless interaction effects suggest added value.
 
 | Variable | Type | Notes |
-|------------------------|------------------------|------------------------|
+|----|----|----|
 | english.learner | Demographic | Early differences shrink over time; weak independent effect. |
 | LimitedEnglishProficiencyIndicator | Demographic | Similar to English Learner — overlaps, weak long-term signal. |
 | non.english.home | Demographic | Weak association, may overlap with other variables. |
@@ -131,8 +131,8 @@ The most consistent predictors of **regional workforce retention** are **sub-bac
 
 In short, the analysis reveals a **dual pipeline**:
 
--   **CTE and 2-year credentials anchor students to Southern Minnesota’s workforce**.
--   **High academic achievement and 4-year+ credentials lead to mobility and employment beyond the region**.
+- **CTE and 2-year credentials anchor students to Southern Minnesota’s workforce**.
+- **High academic achievement and 4-year+ credentials lead to mobility and employment beyond the region**.
 
 This suggests that interventions to strengthen the regional workforce should prioritize **CTE pathways, 2-year institutions, and supports for low-income and special education students**, while also recognizing that academic high-achievers are more likely to leave the region.
 
@@ -146,43 +146,43 @@ The evidence is clear: **postsecondary experiences are the strongest predictors 
 
 ### **1. Attending Postsecondary Education**
 
--   **Key Predictors**: Economic status (low-income less likely to attend), race/ethnicity (persistent gaps), and special education status (lower attendance).\
--   **Takeaway**: Disadvantaged students are disproportionately less likely to enroll in PS at all, putting them at high risk of long-term disconnection.
+- **Key Predictors**: Economic status (low-income less likely to attend), race/ethnicity (persistent gaps), and special education status (lower attendance).\
+- **Takeaway**: Disadvantaged students are disproportionately less likely to enroll in PS at all, putting them at high risk of long-term disconnection.
 
 ------------------------------------------------------------------------
 
 ### **2. Postsecondary Graduation (ps.grad)**
 
--   **Key Predictors**: Economic status and SPED remain barriers to completion; racial gaps persist; academic readiness improves odds of graduating.\
--   **Takeaway**: Simply **completing** PS dramatically reduces disconnection and boosts employment. Non-completers remain the most vulnerable group in the workforce pipeline.
+- **Key Predictors**: Economic status and SPED remain barriers to completion; racial gaps persist; academic readiness improves odds of graduating.\
+- **Takeaway**: Simply **completing** PS dramatically reduces disconnection and boosts employment. Non-completers remain the most vulnerable group in the workforce pipeline.
 
 ------------------------------------------------------------------------
 
 ### **3. Institution Sector of Graduation (ps.grad.InstitutionSector)**
 
--   **Key Predictors**:
-    -   **Academic rigor and PSEO** → 4-year completions.\
-    -   **CTE engagement, SPED, and low-income** → 2-year completions.\
--   **Takeaway**: Institution type sorts students into applied versus academic pathways. Since **2-year completions are more strongly tied to regional employment**, CTE and disadvantage groups inadvertently form the backbone of Southern MN’s workforce, while academically strong students pursue more mobile 4-year pathways.
+- **Key Predictors**:
+  - **Academic rigor and PSEO** → 4-year completions.\
+  - **CTE engagement, SPED, and low-income** → 2-year completions.\
+- **Takeaway**: Institution type sorts students into applied versus academic pathways. Since **2-year completions are more strongly tied to regional employment**, CTE and disadvantage groups inadvertently form the backbone of Southern MN’s workforce, while academically strong students pursue more mobile 4-year pathways.
 
 ------------------------------------------------------------------------
 
 ### **4. Location of Graduation (ps.grad.location)**
 
--   **Key Predictors**:
-    -   **Disadvantaged students (low-income, SPED, marginalized race/ethnicity)** → more likely to graduate in **Southern MN**.\
-    -   **High scorers and PSEO participants** → more likely to graduate outside the region (other MN or out-of-state).\
-    -   **Local economic conditions** (lower wages, higher unemployment) → stronger Southern MN completions.\
--   **Takeaway**: Regional completions are most common among disadvantaged groups and CTE students, reinforcing their role in regional workforce stability.
+- **Key Predictors**:
+  - **Disadvantaged students (low-income, SPED, marginalized race/ethnicity)** → more likely to graduate in **Southern MN**.\
+  - **High scorers and PSEO participants** → more likely to graduate outside the region (other MN or out-of-state).\
+  - **Local economic conditions** (lower wages, higher unemployment) → stronger Southern MN completions.\
+- **Takeaway**: Regional completions are most common among disadvantaged groups and CTE students, reinforcing their role in regional workforce stability.
 
 ------------------------------------------------------------------------
 
 ### **5. Highest Credential Earned (highest.cred.level)**
 
--   **Key Predictors**:
-    -   **Academic rigor (ACT, MCA)** and **PSEO** → bachelor’s or higher.\
-    -   **CTE engagement, low-income, SPED, disadvantaged counties** → associate or sub-associate.\
--   **Takeaway**: Credential level is the clearest stratifier of opportunity. **Bachelor’s+ aligns with mobility**, while **associate/sub-associate aligns with regional employment**.
+- **Key Predictors**:
+  - **Academic rigor (ACT, MCA)** and **PSEO** → bachelor’s or higher.\
+  - **CTE engagement, low-income, SPED, disadvantaged counties** → associate or sub-associate.\
+- **Takeaway**: Credential level is the clearest stratifier of opportunity. **Bachelor’s+ aligns with mobility**, while **associate/sub-associate aligns with regional employment**.
 
 ------------------------------------------------------------------------
 
@@ -191,13 +191,13 @@ The evidence is clear: **postsecondary experiences are the strongest predictors 
 The postsecondary pipeline is shaped by **two reinforcing forces**:
 
 1.  **Mobility Pipeline**:
-    -   Driven by **academic rigor and PSEO**.
-    -   Leads to **4-year+ degrees, completions outside the region, and statewide mobility**.
-    -   Most common among advantaged, higher-scoring students.
+    - Driven by **academic rigor and PSEO**.
+    - Leads to **4-year+ degrees, completions outside the region, and statewide mobility**.
+    - Most common among advantaged, higher-scoring students.
 2.  **Regional Pipeline**:
-    -   Driven by **CTE engagement, 2-year institutions, economic disadvantage, SPED, and lower-wage/unemployment counties**.
-    -   Leads to **associate/sub-associate degrees and Southern MN completions**, strongly tied to **meaningful regional employment**.
-    -   Most common among disadvantaged students who remain anchored locally.
+    - Driven by **CTE engagement, 2-year institutions, economic disadvantage, SPED, and lower-wage/unemployment counties**.
+    - Leads to **associate/sub-associate degrees and Southern MN completions**, strongly tied to **meaningful regional employment**.
+    - Most common among disadvantaged students who remain anchored locally.
 
 In short: **Southern MN’s workforce stability relies heavily on the regional pipeline of 2-year and CTE-driven pathways**, which disproportionately serve low-income and SPED students. Meanwhile, academically strong and advantaged students pursue 4-year and higher credentials, fueling statewide and out-of-state mobility.
 
@@ -212,14 +212,14 @@ In short: **Southern MN’s workforce stability relies heavily on the regional p
 Across all three binary comparisons and all time horizons (1, 5, and 10 years after graduation), the CART models consistently highlight a **dual pipeline** shaping workforce outcomes in Southern Minnesota:
 
 1.  **Anchors to Regional Employment:**
-    -   **CTE engagement and depth (≥2–5 courses, concentrator/completor status).**
-    -   **Sub-baccalaureate pathways** (2-year credentials, certificates, some college).
-    -   **Regional postsecondary attendance and graduation.**
-    -   **Favorable local economic conditions** (competitive wages, lower unemployment).
+    - **CTE engagement and depth (≥2–5 courses, concentrator/completor status).**
+    - **Sub-baccalaureate pathways** (2-year credentials, certificates, some college).
+    - **Regional postsecondary attendance and graduation.**
+    - **Favorable local economic conditions** (competitive wages, lower unemployment).
 2.  **Pathways to Statewide Mobility or Disconnection:**
-    -   **Bachelor’s degree attainment and high academic achievement** (ACT ≥25–28, MCA Reading ≥4) consistently predict outward mobility into statewide labor markets.
-    -   **Weak academic readiness** (low ACT, low MCA scores) and **lack of CTE engagement** predict disconnection (no record, not attending PS).
-    -   **Structural disadvantages** (low-income, SpecialEd status, some racial/ethnic groups) persistently raise the risk of disconnection across all timeframes.
+    - **Bachelor’s degree attainment and high academic achievement** (ACT ≥25–28, MCA Reading ≥4) consistently predict outward mobility into statewide labor markets.
+    - **Weak academic readiness** (low ACT, low MCA scores) and **lack of CTE engagement** predict disconnection (no record, not attending PS).
+    - **Structural disadvantages** (low-income, SpecialEd status, some racial/ethnic groups) persistently raise the risk of disconnection across all timeframes.
 
 The synthesis underscores that **CTE and regional postsecondary pathways are the backbone of workforce retention**, while higher academic achievement and 4-year credentials lead to broader mobility. Disadvantaged groups remain at elevated risk of disconnection without targeted supports.
 
@@ -227,25 +227,25 @@ The synthesis underscores that **CTE and regional postsecondary pathways are the
 
 ### **Year 1 after Graduation**
 
--   **Anchors:** Early anchoring comes primarily from **CTE engagement, math proficiency, and local labor market strength.**
--   **Barriers:** SpecialEd involvement, weak academic readiness, and lack of CTE drive early disconnection or statewide mobility.
--   **Interpretation:** At this stage, **exposure to CTE and basic academic preparation** are critical to prevent graduates from being disconnected from work or education.
+- **Anchors:** Early anchoring comes primarily from **CTE engagement, math proficiency, and local labor market strength.**
+- **Barriers:** SpecialEd involvement, weak academic readiness, and lack of CTE drive early disconnection or statewide mobility.
+- **Interpretation:** At this stage, **exposure to CTE and basic academic preparation** are critical to prevent graduates from being disconnected from work or education.
 
 ------------------------------------------------------------------------
 
 ### **Year 5 after Graduation**
 
--   **Anchors:** **Regional postsecondary engagement, CTE depth, and sub-baccalaureate completion** are most decisive.
--   **Barriers:** 4-year/Bachelor’s attainment predicts mobility out of the region; SpecialEd, gender, and racial disparities continue to shape risks of disconnection.
--   **Interpretation:** Mid-career, **institutional pathways (regional PS, CTE credentials)** dominate as anchors, while higher academic achievement channels students outward.
+- **Anchors:** **Regional postsecondary engagement, CTE depth, and sub-baccalaureate completion** are most decisive.
+- **Barriers:** 4-year/Bachelor’s attainment predicts mobility out of the region; SpecialEd, gender, and racial disparities continue to shape risks of disconnection.
+- **Interpretation:** Mid-career, **institutional pathways (regional PS, CTE credentials)** dominate as anchors, while higher academic achievement channels students outward.
 
 ------------------------------------------------------------------------
 
 ### **Year 10 after Graduation**
 
--   **Anchors:** Long-term anchoring depends on **regional postsecondary graduation, sustained CTE involvement, and competitive wage environments.**
--   **Barriers:** Weak academic scores, lack of PS/CTE ties, and subgroup inequities push graduates toward disconnection or employment outside the region.
--   **Interpretation:** At this stage, outcomes stabilize: **CTE and regional PS pipelines anchor students**, while **4-year pathways and weak local wages reinforce outward movement or disconnection.**
+- **Anchors:** Long-term anchoring depends on **regional postsecondary graduation, sustained CTE involvement, and competitive wage environments.**
+- **Barriers:** Weak academic scores, lack of PS/CTE ties, and subgroup inequities push graduates toward disconnection or employment outside the region.
+- **Interpretation:** At this stage, outcomes stabilize: **CTE and regional PS pipelines anchor students**, while **4-year pathways and weak local wages reinforce outward movement or disconnection.**
 
 ------------------------------------------------------------------------
 
@@ -256,8 +256,8 @@ The CART analyses converge on three central insights:
 1.  **CTE engagement is the most consistent predictor of regional employment.** Even minimal exposure is protective, while concentrator/completor status provides the strongest anchor.
 2.  **Regional postsecondary pathways matter profoundly.** Attendance and completion in Southern Minnesota institutions substantially increase the odds of regional employment at 5 and 10 years.
 3.  **Mobility vs. disconnection split.**
-    -   **Mobility:** High achievers and 4-year graduates are more likely to find meaningful employment statewide.
-    -   **Disconnection:** Students with weak academic readiness, limited CTE, and structural disadvantages face higher risks of no employment record or PS engagement.
+    - **Mobility:** High achievers and 4-year graduates are more likely to find meaningful employment statewide.
+    - **Disconnection:** Students with weak academic readiness, limited CTE, and structural disadvantages face higher risks of no employment record or PS engagement.
 
 This duality reflects a **regional workforce pipeline rooted in CTE and 2-year credentials**, contrasted with a **mobility pipeline driven by academic achievement and 4-year degrees.**
 
@@ -265,12 +265,12 @@ This duality reflects a **regional workforce pipeline rooted in CTE and 2-year c
 
 ### **Policy/Practice Implications**
 
--   **Expand and deepen CTE opportunities**, ensuring more students complete concentrator/completor pathways and take multiple courses (≥2–5).
--   **Strengthen regional postsecondary connections**, positioning 2-year institutions as central anchors for workforce retention.
--   **Elevate sub-baccalaureate pathways** as critical contributors to regional workforce strength.
--   **Design retention strategies for 4-year graduates and high academic achievers**, offering internships, research, and professional opportunities tied to local industries.
--   **Target supports for vulnerable groups** (low-income, SpecialEd, racial/ethnic subgroups) to reduce disconnection.
--   **Maintain competitive local wages and employment opportunities** to counter outward mobility and anchor graduates long-term.
+- **Expand and deepen CTE opportunities**, ensuring more students complete concentrator/completor pathways and take multiple courses (≥2–5).
+- **Strengthen regional postsecondary connections**, positioning 2-year institutions as central anchors for workforce retention.
+- **Elevate sub-baccalaureate pathways** as critical contributors to regional workforce strength.
+- **Design retention strategies for 4-year graduates and high academic achievers**, offering internships, research, and professional opportunities tied to local industries.
+- **Target supports for vulnerable groups** (low-income, SpecialEd, racial/ethnic subgroups) to reduce disconnection.
+- **Maintain competitive local wages and employment opportunities** to counter outward mobility and anchor graduates long-term.
 
 In short, the models reaffirm that **Southern Minnesota’s workforce is sustained by CTE and 2-year credentials**, but retaining academically strong and 4-year graduates will require intentional strategies. Meanwhile, **addressing equity gaps and economic competitiveness is essential** to prevent long-term disconnection.
 
@@ -288,11 +288,11 @@ While not capturing all individual-level complexity, these models highlight **di
 
 The following predictors emerged as the most consistently influential:
 
--   **Academic readiness**: MCA Reading and ACT Composite Score.
--   **Economic status**: Persistent disadvantages for low-income students.
--   **Race/Ethnicity**: White and Asian/PI students more likely to reach higher credentials; Black, AI, and Hispanic students more often concentrated in lower or incomplete outcomes.
--   **PSEO participation**: Steers students toward bachelor’s+ and out-of-region completions.
--   **CTE engagement (courses taken)**: Reinforces regional and sub-baccalaureate pathways.
+- **Academic readiness**: MCA Reading and ACT Composite Score.
+- **Economic status**: Persistent disadvantages for low-income students.
+- **Race/Ethnicity**: White and Asian/PI students more likely to reach higher credentials; Black, AI, and Hispanic students more often concentrated in lower or incomplete outcomes.
+- **PSEO participation**: Steers students toward bachelor’s+ and out-of-region completions.
+- **CTE engagement (courses taken)**: Reinforces regional and sub-baccalaureate pathways.
 
 These predictors operate in **two clear pipelines** — one driving local attachment through sub-baccalaureate credentials, and one fostering mobility through advanced credentials.
 
@@ -300,17 +300,17 @@ These predictors operate in **two clear pipelines** — one driving local attach
 
 #### 1. **Graduation Location (ps.grad.location)**
 
--   **Regional completions** clustered among **economically disadvantaged students with moderate academic readiness**.
--   **Non-completion** was strongly tied to **low ACT and MCA scores**, often regardless of background.
--   **High academic readiness and PSEO participation** predicted completions outside the region, fueling mobility pathways.
+- **Regional completions** clustered among **economically disadvantaged students with moderate academic readiness**.
+- **Non-completion** was strongly tied to **low ACT and MCA scores**, often regardless of background.
+- **High academic readiness and PSEO participation** predicted completions outside the region, fueling mobility pathways.
 
 **Implication**: Regional institutions disproportionately serve disadvantaged students who achieve moderate readiness, while high scorers leave the region for completion.
 
 #### 2. **Highest Credential Earned (highest.cred.level)**
 
--   **Bachelor’s or higher** credentials were most strongly linked to **high MCA and ACT scores**, advantaged status, and **PSEO participation**.
--   **Non-completion** was almost guaranteed for students with low MCA Reading or ACT scores, even when other factors were favorable.
--   **Associate or lower credentials** (though less prominent in the tree structure) align with CTE-heavy pathways, serving as stabilizers for the regional workforce.
+- **Bachelor’s or higher** credentials were most strongly linked to **high MCA and ACT scores**, advantaged status, and **PSEO participation**.
+- **Non-completion** was almost guaranteed for students with low MCA Reading or ACT scores, even when other factors were favorable.
+- **Associate or lower credentials** (though less prominent in the tree structure) align with CTE-heavy pathways, serving as stabilizers for the regional workforce.
 
 **Implication**: Academic readiness acts as the primary gateway to bachelor’s+ attainment, but economic and racial inequities remain barriers, even among high scorers.
 
@@ -319,20 +319,20 @@ These predictors operate in **two clear pipelines** — one driving local attach
 Together, the models reinforce the existence of a **dual-pipeline system** in Southern Minnesota:
 
 1.  **Regional Workforce Pipeline**
-    -   Driven by **CTE engagement, associate-or-lower credentials, and regional completions**.
-    -   Anchors students with **economic disadvantage and moderate readiness** into the local labor market.
-    -   Provides workforce stability but limits long-term mobility and earning potential.
+    - Driven by **CTE engagement, associate-or-lower credentials, and regional completions**.
+    - Anchors students with **economic disadvantage and moderate readiness** into the local labor market.
+    - Provides workforce stability but limits long-term mobility and earning potential.
 2.  **Mobility Pipeline**
-    -   Driven by **academic rigor, bachelor’s+ attainment, PSEO participation, and out-of-region completions**.
-    -   Attracts **advantaged, high-scoring students**, who are least likely to remain in the region after completion.
-    -   Fuels statewide and out-of-state labor markets more than the local workforce.
+    - Driven by **academic rigor, bachelor’s+ attainment, PSEO participation, and out-of-region completions**.
+    - Attracts **advantaged, high-scoring students**, who are least likely to remain in the region after completion.
+    - Fuels statewide and out-of-state labor markets more than the local workforce.
 
 ### **Policy Implications**
 
--   **Strengthen regional anchors**: Expand academic and financial supports for disadvantaged, moderate scorers to ensure successful completions in Southern MN institutions.
--   **Address inequities in bachelor’s+ attainment**: Target resources for high-achieving but low-income and underrepresented students to reduce barriers to advanced credentials.
--   **Leverage CTE strategically**: Maintain CTE as a stabilizer but ensure stackable pathways to prevent students from being locked into sub-associate outcomes.
--   **Engage high-achievers locally**: Create incentives and career opportunities that connect PSEO participants and bachelor’s+ completers back to the region to mitigate brain drain.
+- **Strengthen regional anchors**: Expand academic and financial supports for disadvantaged, moderate scorers to ensure successful completions in Southern MN institutions.
+- **Address inequities in bachelor’s+ attainment**: Target resources for high-achieving but low-income and underrepresented students to reduce barriers to advanced credentials.
+- **Leverage CTE strategically**: Maintain CTE as a stabilizer but ensure stackable pathways to prevent students from being locked into sub-associate outcomes.
+- **Engage high-achievers locally**: Create incentives and career opportunities that connect PSEO participants and bachelor’s+ completers back to the region to mitigate brain drain.
 
 ### **Conclusion**
 
@@ -375,57 +375,57 @@ Taken together, the story is clear: **for non-college graduates, CTE engagement 
 
 This synthesis compares the three binary outcomes:
 
--   **A:** Regional vs. Statewide Meaningful Employment
--   **B:** Regional vs. Not Meaningful, Not Attending PS
--   **C:** Regional vs. No MN Employment Record, Not Attending PS
+- **A:** Regional vs. Statewide Meaningful Employment
+- **B:** Regional vs. Not Meaningful, Not Attending PS
+- **C:** Regional vs. No MN Employment Record, Not Attending PS
 
 **Model Performance Across Outcomes**
 
--   **A (Regional vs. Statewide):** Accuracy levels were **high (≈67–75%)**, consistently outperforming baseline. This reflects clearer separations in who stays local versus who is mobile within Minnesota.
--   **B (Regional vs. Not Meaningful/No PS):** Accuracy was **modest (≈58–62%)**, slightly above baseline. Distinguishing meaningful local work from marginal attachment is harder, as both groups may share vulnerabilities.
--   **C (Regional vs. No MN Record/No PS):** Accuracy was **moderate (≈56–62%)**, again above baseline but with declining lift over time. Predictors are strongest in the short-term, while long-term outcomes are harder to forecast from high school data.
+- **A (Regional vs. Statewide):** Accuracy levels were **high (≈67–75%)**, consistently outperforming baseline. This reflects clearer separations in who stays local versus who is mobile within Minnesota.
+- **B (Regional vs. Not Meaningful/No PS):** Accuracy was **modest (≈58–62%)**, slightly above baseline. Distinguishing meaningful local work from marginal attachment is harder, as both groups may share vulnerabilities.
+- **C (Regional vs. No MN Record/No PS):** Accuracy was **moderate (≈56–62%)**, again above baseline but with declining lift over time. Predictors are strongest in the short-term, while long-term outcomes are harder to forecast from high school data.
 
 **Pattern:** CART models are most powerful when contrasting **regional stayers vs. statewide movers (A)**, and least predictive when comparing **regional stayers vs. those completely disconnected (C at 10 years)**.
 
 ### **Key Predictors by Outcome**
 
--   **A (Regional vs. Statewide):**\
-    Race/Ethnicity, ACT Composite Score, MCA Reading, Economic Status, PSEO Participation.\
-    *Interpretation:* Academic readiness and mobility pipelines (ACT, PSEO) drive statewide employment; regional employment is anchored by modest academic readiness and lower-income students.
--   **B (Regional vs. Not Meaningful/No PS):**\
-    CTE Achievement, Total CTE Courses Taken, Race/Ethnicity, Special Education Status, ACT Composite Score.\
-    *Interpretation:* CTE participation is the strongest shield against disconnection, while special education and race stratify risks.
--   **C (Regional vs. No MN Record/No PS):**\
-    Total CTE Courses Taken, CTE Achievement, MCA Math/Reading, Race/Ethnicity, Special Education Status.\
-    *Interpretation:* Depth in CTE is consistently protective; academic readiness matters differently over time (math at 1 year, ACT at 5 years, reading at 10). Racial and disability disparities persist.
+- **A (Regional vs. Statewide):**\
+  Race/Ethnicity, ACT Composite Score, MCA Reading, Economic Status, PSEO Participation.\
+  *Interpretation:* Academic readiness and mobility pipelines (ACT, PSEO) drive statewide employment; regional employment is anchored by modest academic readiness and lower-income students.
+- **B (Regional vs. Not Meaningful/No PS):**\
+  CTE Achievement, Total CTE Courses Taken, Race/Ethnicity, Special Education Status, ACT Composite Score.\
+  *Interpretation:* CTE participation is the strongest shield against disconnection, while special education and race stratify risks.
+- **C (Regional vs. No MN Record/No PS):**\
+  Total CTE Courses Taken, CTE Achievement, MCA Math/Reading, Race/Ethnicity, Special Education Status.\
+  *Interpretation:* Depth in CTE is consistently protective; academic readiness matters differently over time (math at 1 year, ACT at 5 years, reading at 10). Racial and disability disparities persist.
 
 ### **Interpretation Over Time**
 
--   **Early (1 Year):**
-    -   *A:* Modest ACT readiness and low-income students more likely to work regionally.
-    -   *B:* CTE engagement differentiates regional workers from those disconnected.
-    -   *C:* Math skills and ≥3 CTE courses are anchors; special education students face higher risks.
--   **Mid-Term (5 Years):**
-    -   *A:* ACT scores, race/ethnicity, and CTE sustain regional employment vs. statewide mobility.
-    -   *B:* CTE remains protective, but race/ethnicity and ACT readiness gain importance.
-    -   *C:* ACT, CTE, race, and income explain who stays regionally attached vs. who disconnects.
--   **Long-Term (10 Years):**
-    -   *A:* Regional employment stabilizes among low-income and modest academic performers; statewide employment aligns with higher scorers.
-    -   *B:* CTE depth still matters, but demographic inequities (race, special education) widen.
-    -   *C:* Reading proficiency and CTE achievement are decisive; racial disparities persist even with strong preparation.
+- **Early (1 Year):**
+  - *A:* Modest ACT readiness and low-income students more likely to work regionally.
+  - *B:* CTE engagement differentiates regional workers from those disconnected.
+  - *C:* Math skills and ≥3 CTE courses are anchors; special education students face higher risks.
+- **Mid-Term (5 Years):**
+  - *A:* ACT scores, race/ethnicity, and CTE sustain regional employment vs. statewide mobility.
+  - *B:* CTE remains protective, but race/ethnicity and ACT readiness gain importance.
+  - *C:* ACT, CTE, race, and income explain who stays regionally attached vs. who disconnects.
+- **Long-Term (10 Years):**
+  - *A:* Regional employment stabilizes among low-income and modest academic performers; statewide employment aligns with higher scorers.
+  - *B:* CTE depth still matters, but demographic inequities (race, special education) widen.
+  - *C:* Reading proficiency and CTE achievement are decisive; racial disparities persist even with strong preparation.
 
 ### **Conclusion**
 
 Across all binaries:
 
--   **CTE depth and achievement are the single most consistent predictors of regional employment** — anchoring students early and protecting against both statewide mobility and disconnection.
--   **Academic readiness matters, but the form shifts over time**: math early, ACT in mid-term, reading in long-term.
--   **Demographics stratify pathways**: race/ethnicity, income, and special education status consistently increase disconnection risks or steer students away from regional employment.
--   Predictive power is strongest in **Outcome A (mobility within MN)** and weakest in **Outcome C (long-term disconnection)**, reflecting how labor market forces dilute the predictive role of high school preparation over time.
+- **CTE depth and achievement are the single most consistent predictors of regional employment** — anchoring students early and protecting against both statewide mobility and disconnection.
+- **Academic readiness matters, but the form shifts over time**: math early, ACT in mid-term, reading in long-term.
+- **Demographics stratify pathways**: race/ethnicity, income, and special education status consistently increase disconnection risks or steer students away from regional employment.
+- Predictive power is strongest in **Outcome A (mobility within MN)** and weakest in **Outcome C (long-term disconnection)**, reflecting how labor market forces dilute the predictive role of high school preparation over time.
 
 ### **Policy Implications**
 
--   **For A (Regional vs. Statewide):** Retain high scorers and PSEO participants by connecting them to local opportunities, since they are most likely to leave the region.
--   **For B (Regional vs. Not Meaningful/No PS):** Expand CTE concentrator/completor opportunities and supports for special education students to prevent early disconnection.
--   **For C (Regional vs. No MN Record/No PS):** Ensure all students reach minimum academic thresholds in math and reading while expanding CTE access; supplement with long-term workforce equity initiatives to sustain regional employment.
--   **Overall:** The region’s workforce stability depends on **expanding CTE depth, addressing academic readiness across subjects, and tackling inequities by race, income, and disability**.
+- **For A (Regional vs. Statewide):** Retain high scorers and PSEO participants by connecting them to local opportunities, since they are most likely to leave the region.
+- **For B (Regional vs. Not Meaningful/No PS):** Expand CTE concentrator/completor opportunities and supports for special education students to prevent early disconnection.
+- **For C (Regional vs. No MN Record/No PS):** Ensure all students reach minimum academic thresholds in math and reading while expanding CTE access; supplement with long-term workforce equity initiatives to sustain regional employment.
+- **Overall:** The region’s workforce stability depends on **expanding CTE depth, addressing academic readiness across subjects, and tackling inequities by race, income, and disability**.
